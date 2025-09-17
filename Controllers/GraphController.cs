@@ -131,7 +131,7 @@ namespace OIDC_ExternalID_API.Controllers
             }
         }
 
-        [HttpGet("getUser")]
+        [HttpGet("getUserByIdentifier(Eg :- User Object ID (UID), User Principal Name (UPN), Email )")]
         [Authorize]
         [ProducesResponseType(typeof(object), 200)]
         [ProducesResponseType(401)]
@@ -418,6 +418,106 @@ namespace OIDC_ExternalID_API.Controllers
         //    }
         //}
 
+        [HttpPatch("updateUserByIdentifier(Eg :- User Object ID (UID), User Principal Name (UPN), Email )")]
+        [Authorize]
+        [ProducesResponseType(200)]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(500)]
+        [SwaggerOperation(
+            Summary = "Update User by ID, UPN, or Email",
+            Description = "Update user attributes in Microsoft Graph API using User Object ID, User Principal Name (UPN), or Email address. The system automatically detects the type of identifier provided.",
+            OperationId = "UpdateUser",
+            Tags = new[] { "Graph" }
+        )]
+        [SwaggerResponse(200, "User updated successfully")]
+        [SwaggerResponse(401, "Unauthorized - Bearer token required")]
+        [SwaggerResponse(404, "User not found")]
+        [SwaggerResponse(500, "Internal server error")]
+        public async Task<IActionResult> UpdateUserByIdentifier(
+            [FromQuery]
+            [SwaggerParameter("User Object ID, User Principal Name (UPN), or Email address", Required = true)]
+            string identifier,
+            [FromBody] Dictionary<string, object> updates)
+        {
+            try
+            {
+                // Validate input
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    return BadRequest("Identifier parameter is required");
+                }
+
+                if (updates == null || updates.Count == 0)
+                {
+                    return BadRequest("Update data is required");
+                }
+
+                string userId = null;
+
+                // Determine the type of identifier and get the user ID
+                if (identifier.Contains("@"))
+                {
+                    // This looks like an email or UPN, try to find user by email first
+                    var users = await _graphServiceClient.Users
+                        .GetAsync(requestConfig =>
+                        {
+                            requestConfig.QueryParameters.Filter = $"mail eq '{identifier}' or otherMails/any(x:x eq '{identifier}')";
+                        });
+
+                    var user = users?.Value?.FirstOrDefault();
+
+                    // If not found by email and it looks like a UPN, try direct UPN lookup
+                    if (user == null)
+                    {
+                        try
+                        {
+                            user = await _graphServiceClient.Users[identifier].GetAsync();
+                        }
+                        catch (ODataError)
+                        {
+                            // User not found by UPN either
+                        }
+                    }
+
+                    if (user == null)
+                        return NotFound("User not found.");
+
+                    userId = user.Id;
+                }
+                else
+                {
+                    // This looks like a user object ID
+                    userId = identifier;
+                }
+
+                // Create user object with updates
+                var userUpdate = new User();
+                foreach (var kvp in updates)
+                {
+                    userUpdate.AdditionalData[kvp.Key] = kvp.Value;
+                }
+
+                // Update the user
+                await _graphServiceClient.Users[userId].PatchAsync(userUpdate);
+
+                return Ok($"User updated successfully.");
+            }
+            catch (ODataError odataError)
+            {
+                // Check if the error is because user was not found
+                if (odataError.Error?.Code == "Request_ResourceNotFound" ||
+                    odataError.Error?.Message?.Contains("does not exist") == true)
+                {
+                    return NotFound("User not found.");
+                }
+                return BadRequest(odataError.Error);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
 
 
 

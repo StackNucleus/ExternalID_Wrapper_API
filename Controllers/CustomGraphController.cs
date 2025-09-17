@@ -177,7 +177,7 @@ namespace OIDC_ExternalID_API.Controllers
         /// <summary>
         /// Get user by ID, UPN, or email using your JWT token to authenticate with Microsoft Graph
         /// </summary>
-        [HttpGet("getUser")]
+        [HttpGet("getUserByIdentifier(Eg :- User Object ID (UID), User Principal Name (UPN), Email )")]
         [Authorize]
         [ProducesResponseType(200)]
         [ProducesResponseType(401)]

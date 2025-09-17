@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Token Timer Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .auth-wrapper {
+            margin-bottom: 20px;
+        }
+        .authorize {
+            padding: 10px 15px;
+            background: #49cc90;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #token-input {
+            width: 300px;
+            padding: 8px;
+            margin: 10px 0;
+        }
+        #set-token-btn {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Token Timer Test Page</h1>
+    
+    <div class="auth-wrapper">
+        <button class="authorize">Authorize</button>
+        <input type="text" id="token-input" placeholder="Enter token here...">
+        <button id="set-token-btn">Set Token</button>
+    </div>
+    
+    <div>
+        <h2>Test Instructions:</h2>
+        <ol>
+            <li>Enter a JWT token in the input field above</li>
+            <li>Click "Set Token"</li>
+            <li>The token timer should appear in the top-right corner</li>
+            <li>It should count down from 60 minutes</li>
+        </ol>
+    </div>
+
+    <script>
+        // Simple test token (this is not a real token, just for testing)
+        const testToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE3MTYyNDI2MjJ9.4id36Jh4F1u7j5xM9H5_5Cn6hE8W9vJ5x8C7x3R1u8Y";
+        
+        document.getElementById('token-input').value = "Bearer " + testToken;
+        
+        document.getElementById('set-token-btn').addEventListener('click', function() {
+            const token = document.getElementById('token-input').value;
+            // Simulate setting the token in the UI
+            console.log('Token set:', token);
+            alert('Token set! Now check the top-right corner for the timer.');
+        });
+    </script>
+    
+    <!-- Include our custom script -->
+    <script src="custom.js"></script>
+</body>
+</html>

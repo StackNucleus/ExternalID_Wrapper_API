@@ -175,6 +175,106 @@ namespace OIDC_ExternalID_API.Controllers
         }
 
         /// <summary>
+        /// Get user by ID, UPN, or email using your JWT token to authenticate with Microsoft Graph
+        /// </summary>
+        [HttpGet("getUser")]
+        [Authorize]
+        [ProducesResponseType(200)]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(500)]
+        [SwaggerOperation(
+            Summary = "Get User by ID, UPN, or Email",
+            Description = "Retrieve user details from Microsoft Graph API using User Object ID, User Principal Name (UPN), or Email address. The system automatically detects the type of identifier provided. Supports all token types (Custom JWT, Azure AD).",
+            OperationId = "GetUserByIdentifier",
+            Tags = new[] { "CustomGraph" }
+        )]
+        public async Task<IActionResult> GetUserByIdentifier(
+            [FromQuery]
+            [SwaggerParameter("User Object ID, User Principal Name (UPN), or Email address", Required = true)]
+            string identifier)
+        {
+            try
+            {
+                // Validate input
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    return BadRequest("Identifier parameter is required");
+                }
+
+                var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+                if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+                {
+                    return Unauthorized("Bearer token is required");
+                }
+
+                var jwtToken = authHeader.Substring("Bearer ".Length);
+                var graphToken = await GetMicrosoftGraphToken(jwtToken);
+                
+                if (string.IsNullOrEmpty(graphToken))
+                {
+                    return Unauthorized("Failed to obtain Microsoft Graph token");
+                }
+
+                using var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", graphToken);
+
+                HttpResponseMessage response = null;
+
+                // Determine the type of identifier and call appropriate method
+                if (identifier.Contains("@"))
+                {
+                    // This looks like an email or UPN, try to find user by email first
+                    response = await client.GetAsync($"https://graph.microsoft.com/v1.0/users?$filter=mail eq '{identifier}' or otherMails/any(x:x eq '{identifier}')");
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var content = await response.Content.ReadAsStringAsync();
+                        var usersData = JsonDocument.Parse(content);
+                        var users = usersData.RootElement.GetProperty("value");
+                        
+                        if (users.GetArrayLength() > 0)
+                        {
+                            return Ok(users[0]);
+                        }
+                        else
+                        {
+                            // If not found by email and it looks like a UPN, try direct UPN lookup
+                            response = await client.GetAsync($"https://graph.microsoft.com/v1.0/users/{identifier}");
+                        }
+                    }
+                }
+                else
+                {
+                    // This looks like a user object ID
+                    response = await client.GetAsync($"https://graph.microsoft.com/v1.0/users/{identifier}");
+                }
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var userData = JsonDocument.Parse(content);
+                    return Ok(userData.RootElement);
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    // Check if it's a 404 Not Found
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        return NotFound("User not found");
+                    }
+                    return StatusCode((int)response.StatusCode, $"Graph API error: {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting user: {Identifier}", identifier);
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Update user by ID using your JWT token to authenticate with Microsoft Graph
         /// </summary>
         [HttpPatch("updateUserById")]

@@ -131,12 +131,88 @@ namespace OIDC_ExternalID_API.Controllers
             }
         }
 
+        [HttpGet("getUser")]
+        [Authorize]
+        [ProducesResponseType(typeof(object), 200)]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(500)]
+        [SwaggerOperation(
+            Summary = "Get User by ID, UPN, or Email",
+            Description = "Retrieve user details from Microsoft Graph API using User Object ID, User Principal Name (UPN), or Email address. The system automatically detects the type of identifier provided.",
+            OperationId = "GetUser",
+            Tags = new[] { "Graph" }
+        )]
+        [SwaggerResponse(200, "User details retrieved successfully", typeof(object))]
+        [SwaggerResponse(401, "Unauthorized - Bearer token required")]
+        [SwaggerResponse(404, "User not found")]
+        [SwaggerResponse(500, "Internal server error")]
+        public async Task<IActionResult> GetUserByIdentifier(
+            [FromQuery]
+            [SwaggerParameter("User Object ID, User Principal Name (UPN), or Email address", Required = true)]
+            string identifier)
+        {
+            try
+            {
+                // Validate input
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    return BadRequest("Identifier parameter is required");
+                }
 
+                User user = null;
 
+                // Determine the type of identifier and call appropriate method
+                if (identifier.Contains("@"))
+                {
+                    // This looks like an email or UPN, try to find user by email first
+                    var users = await _graphServiceClient.Users
+                        .GetAsync(requestConfig =>
+                        {
+                            requestConfig.QueryParameters.Filter = $"mail eq '{identifier}' or otherMails/any(x:x eq '{identifier}')";
+                        });
 
+                    user = users?.Value?.FirstOrDefault();
 
+                    // If not found by email and it looks like a UPN, try direct UPN lookup
+                    if (user == null && identifier.Contains("@"))
+                    {
+                        try
+                        {
+                            user = await _graphServiceClient.Users[identifier].GetAsync();
+                        }
+                        catch (ODataError)
+                        {
+                            // User not found by UPN either, will return 404 below
+                        }
+                    }
+                }
+                else
+                {
+                    // This looks like a user object ID
+                    user = await _graphServiceClient.Users[identifier].GetAsync();
+                }
 
-        // ... existing code ...
+                if (user == null)
+                    return NotFound("User not found.");
+
+                return Ok(user);
+            }
+            catch (ODataError odataError)
+            {
+                // Check if the error is because user was not found
+                if (odataError.Error?.Code == "Request_ResourceNotFound" ||
+                    odataError.Error?.Message?.Contains("does not exist") == true)
+                {
+                    return NotFound("User not found.");
+                }
+                return BadRequest(odataError.Error);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
 
         [HttpGet("getUserByUpn")]
         [Authorize]
@@ -181,15 +257,6 @@ namespace OIDC_ExternalID_API.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-
-        // ... existing code ...
-
-
-
-
-
-
-
 
         // [HttpGet("Get_User/by-email")]
         [HttpGet("getUserByEmail")]

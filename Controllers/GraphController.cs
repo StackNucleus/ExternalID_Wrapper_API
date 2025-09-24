@@ -131,7 +131,7 @@ namespace OIDC_ExternalID_API.Controllers
             }
         }
 
-        [HttpGet("getUserByIdentifier(Identifier => Eg :- User Object ID (UID) / User Principal Name (UPN) / Email )")]
+        [HttpGet("getUserByIdentifier")] // (Identifier => Eg :- User Object ID (UID) / User Principal Name (UPN) / Email )
         [Authorize]
         [ProducesResponseType(typeof(object), 200)]
         [ProducesResponseType(401)]
@@ -419,7 +419,7 @@ namespace OIDC_ExternalID_API.Controllers
         //    }
         //}
 
-        [HttpPatch("updateUserByIdentifier(Identifier => Eg :- User Object ID (UID) / User Principal Name (UPN) / Email )")]
+        [HttpPatch("updateUserByIdentifier")] // (Identifier => Eg :- User Object ID (UID) / User Principal Name (UPN) / Email )
         [Authorize]
         [ProducesResponseType(200)]
         [ProducesResponseType(401)]
@@ -591,7 +591,7 @@ namespace OIDC_ExternalID_API.Controllers
         //}
 
 
-        [HttpPatch("updateUserAttributesByIdentifier(Identifier => Eg :- User Object ID (UID) / User Principal Name (UPN) / Email )")]
+        [HttpPatch("updateUserAttributesByIdentifier")] // (Identifier => Eg :- User Object ID (UID) / User Principal Name (UPN) / Email )
         [Authorize]
         [ProducesResponseType(200)]
         [ProducesResponseType(401)]
@@ -757,7 +757,7 @@ namespace OIDC_ExternalID_API.Controllers
         //    }
         //}
 
-        [HttpDelete("deleteUserByIdentifier(Identifier => Eg :- User Object ID (UID) / User Principal Name (UPN) / Email )")]
+        [HttpDelete("deleteUserByIdentifier")] // (Identifier => Eg :- User Object ID (UID) / User Principal Name (UPN) / Email )
         [Authorize]
         [ProducesResponseType(200)]
         [ProducesResponseType(401)]

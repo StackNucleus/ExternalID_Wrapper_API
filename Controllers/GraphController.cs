@@ -215,6 +215,7 @@ namespace OIDC_ExternalID_API.Controllers
         }
 
         [HttpGet("getUserByUpn")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         [Authorize]
         [ProducesResponseType(typeof(object), 200)]
         [ProducesResponseType(401)]
@@ -288,6 +289,7 @@ namespace OIDC_ExternalID_API.Controllers
 
 
         [HttpGet("getUserDetails(Default: displayName,givenName,identities)")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         [Authorize]
         [ProducesResponseType(typeof(UserDetailResponse), 200)]
         [ProducesResponseType(401)]

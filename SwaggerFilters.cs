@@ -1,8 +1,8 @@
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
-using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Reflection;
-using Microsoft.OpenApi.Any;
 
 namespace OIDC_ExternalID_API
 {

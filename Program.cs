@@ -132,7 +132,7 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new OpenApiInfo 
     { 
         Title = "External ID Graph API", 
-        Version = "v1",
+        Version = "v1.0",
         Description = @"
         ## 🔐 Authentication & User Management API
 

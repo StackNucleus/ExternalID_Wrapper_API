@@ -31,6 +31,9 @@ namespace OIDC_ExternalID_API
                 case "Graph":
                     AddGraphControllerDocs(operation, actionName);
                     break;
+                case "CustomTest":
+                    AddCustomTestControllerDocs(operation, actionName);
+                    break;
             }
 
             // Add common examples for all operations
@@ -221,6 +224,55 @@ namespace OIDC_ExternalID_API
 
                         **Authentication:**
                         Uses configured Azure AD application credentials.";
+                    break;
+            }
+        }
+
+        private void AddCustomTestControllerDocs(OpenApiOperation operation, string actionName)
+        {
+            switch (actionName)
+            {
+                case "GetUserByIdentifier":
+                    operation.Summary = "Get User by ID, UPN, or Email (Delegated Permissions)";
+                    operation.Description = @"
+                        Retrieve user details using delegated permissions with the authenticated user's token.
+
+                        **Features:**
+                        - Uses the authenticated user's access token directly with Microsoft Graph API
+                        - Supports delegated permissions model
+                        - Automatic user identification (ID, UPN, or email)
+
+                        **Authentication:**
+                        Requires a valid Azure AD access token with delegated permissions (User.Read.All).";
+                    break;
+
+                case "UpdateUserByIdentifier":
+                    operation.Summary = "Update User by ID, UPN, or Email (Delegated Permissions)";
+                    operation.Description = @"
+                        Update user attributes using delegated permissions with the authenticated user's token.
+
+                        **Features:**
+                        - Uses the authenticated user's access token directly with Microsoft Graph API
+                        - Supports delegated permissions model
+                        - Automatic user identification (ID, UPN, or email)
+
+                        **Authentication:**
+                        Requires a valid Azure AD access token with delegated permissions (User.ReadWrite.All).";
+                    break;
+
+                case "DeleteUserByIdentifier":
+                    operation.Summary = "Delete User by ID, UPN, or Email (Delegated Permissions)";
+                    operation.Description = @"
+                        Delete a user using delegated permissions with the authenticated user's token.
+
+                        **Features:**
+                        - Uses the authenticated user's access token directly with Microsoft Graph API
+                        - Supports delegated permissions model
+                        - Automatic user identification (ID, UPN, or email)
+                        - ⚠️ Permanent operation
+
+                        **Authentication:**
+                        Requires a valid Azure AD access token with delegated permissions (User.ReadWrite.All).";
                     break;
             }
         }

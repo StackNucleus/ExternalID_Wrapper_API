@@ -572,7 +572,7 @@ namespace OIDC_ExternalID_API.Controllers
         [Authorize]
         [ProducesResponseType(200)]
         [ProducesResponseType(401)]
-        [ApiExplorerSettings(IgnoreApi = true)]
+        [ApiExplorerSettings(IgnoreApi = false)]
         [SwaggerOperation(
             Summary = "Get writable user properties",
             Description = "Returns a list of user properties that can typically be updated.",

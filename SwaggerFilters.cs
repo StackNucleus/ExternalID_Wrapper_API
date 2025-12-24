@@ -74,11 +74,11 @@ namespace OIDC_ExternalID_API
                         **Required Fields:**
                         - `client_id`: Your Azure AD application client ID
                         - `client_secret`: Your Azure AD application client secret
-                        
+
                         **Optional Fields:**
                         - `scope`: Microsoft Graph API scope (defaults to `https://graph.microsoft.com/.default`)
                         - `expires_in_minutes`: Custom expiration time (1-1440 minutes, default: 60)
-                        
+
                         **Security Benefits:**
                         - Forced token refresh cycles
                         - Reduced attack window
@@ -228,7 +228,7 @@ namespace OIDC_ExternalID_API
             }
         }
 
-        private void AddCustomTestControllerDocs(OpenApiOperation operation, string actionName)
+        private void AddDGraphControllerDocs(OpenApiOperation operation, string actionName)
         {
             switch (actionName)
             {
@@ -463,4 +463,4 @@ namespace OIDC_ExternalID_API
             }
         }
     }
-} 
+}

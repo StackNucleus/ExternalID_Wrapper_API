@@ -23,7 +23,7 @@ namespace OIDC_ExternalID_API.Controllers
 
         /// <summary>
         /// Generate Azure AD token for Microsoft Graph API access using client credentials flow
-        /// This token can be used for both GraphController and CustomGraphController
+        /// This token can be used for both GraphController and DGraphController
         /// Supports custom expiration time control for manual token refresh cycles
         /// </summary>
         /// <param name="request">Azure AD client credentials request with optional custom expiration</param>
@@ -66,9 +66,9 @@ namespace OIDC_ExternalID_API.Controllers
                 var customExpirationMinutes = request.expires_in_minutes ?? 60;
                 if (customExpirationMinutes < 1 || customExpirationMinutes > 1440)
                 {
-                    return BadRequest(new { 
-                        error = "invalid_request", 
-                        error_description = "expires_in_minutes must be between 1 and 1440 (24 hours)" 
+                    return BadRequest(new {
+                        error = "invalid_request",
+                        error_description = "expires_in_minutes must be between 1 and 1440 (24 hours)"
                     });
                 }
 
@@ -93,33 +93,33 @@ namespace OIDC_ExternalID_API.Controllers
 
                 // Request token from Azure AD
                 var tokenResponse = await _httpClient.PostAsync($"https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token", tokenRequest);
-                
+
                 if (tokenResponse.IsSuccessStatusCode)
                 {
                     var responseContent = await tokenResponse.Content.ReadAsStringAsync();
                     var tokenData = JsonSerializer.Deserialize<AzureAdTokenResponse>(responseContent);
-                    
+
                     // Enhance response with custom expiration information
                     var issuedAt = DateTime.UtcNow;
                     var azureExpiresAt = issuedAt.AddSeconds(tokenData.expires_in);
                     var customExpiresAt = issuedAt.AddMinutes(customExpirationMinutes);
-                    
+
                     tokenData.issued_at = issuedAt;
                     tokenData.expires_at = azureExpiresAt;
                     tokenData.expires_in_human = FormatTimespan(TimeSpan.FromSeconds(tokenData.expires_in));
                     tokenData.custom_expires_in_minutes = customExpirationMinutes;
                     tokenData.custom_expires_at = customExpiresAt;
-                    tokenData.token_refresh_guidance = customExpirationMinutes < (tokenData.expires_in / 60) 
-                        ? $"Recommended to refresh token after {customExpirationMinutes} minutes for security" 
+                    tokenData.token_refresh_guidance = customExpirationMinutes < (tokenData.expires_in / 60)
+                        ? $"Recommended to refresh token after {customExpirationMinutes} minutes for security"
                         : $"Token will expire from Azure AD in {tokenData.expires_in / 60} minutes, refresh before then";
-                    
+
                     return Ok(tokenData);
                 }
                 else
                 {
                     var errorContent = await tokenResponse.Content.ReadAsStringAsync();
                     _logger.LogError($"Azure AD token request failed: {tokenResponse.StatusCode} - {errorContent}");
-                    
+
                     // Try to parse error response
                     try
                     {
@@ -159,20 +159,20 @@ namespace OIDC_ExternalID_API.Controllers
         [Required]
         [SwaggerSchema(Description = "Azure AD application client ID")]
         public string client_id { get; set; }
-        
+
         /// <summary>
         /// Your Azure AD application client secret
         /// </summary>
         [Required]
         [SwaggerSchema(Description = "Azure AD application client secret")]
         public string client_secret { get; set; }
-        
+
         /// <summary>
         /// OAuth2 scope (default: https://graph.microsoft.com/.default)
         /// </summary>
         [SwaggerSchema(Description = "OAuth2 scope for Microsoft Graph access")]
         public string scope { get; set; }
-        
+
         /// <summary>
         /// Custom expiration time in minutes for manual token refresh cycles (default: 60, min: 1, max: 1440)
         /// This controls when you should manually generate a new token for enhanced security.
@@ -190,48 +190,48 @@ namespace OIDC_ExternalID_API.Controllers
         /// <summary>Azure AD access token</summary>
         [SwaggerSchema(Description = "Azure AD access token for Microsoft Graph API")]
         public string access_token { get; set; }
-        
+
         /// <summary>Token type (always 'Bearer')</summary>
         [SwaggerSchema(Description = "Token type, always 'Bearer'")]
         public string token_type { get; set; }
-        
+
         /// <summary>Azure AD token expiration in seconds</summary>
         [SwaggerSchema(Description = "Azure AD token expiration time in seconds (typically 3600)")]
         public int expires_in { get; set; }
-        
+
         /// <summary>OAuth2 scope granted</summary>
         [SwaggerSchema(Description = "OAuth2 scope that was granted")]
         public string scope { get; set; }
-        
+
         /// <summary>Refresh token (if available)</summary>
         [SwaggerSchema(Description = "Refresh token for obtaining new access tokens")]
         public string refresh_token { get; set; }
-        
+
         /// <summary>ID token (if available)</summary>
         [SwaggerSchema(Description = "OpenID Connect ID token")]
         public string id_token { get; set; }
-        
+
         // Enhanced expiration information
         /// <summary>When the Azure AD token expires (UTC)</summary>
         [SwaggerSchema(Description = "Absolute expiration time of the Azure AD token (UTC)")]
         public DateTime expires_at { get; set; }
-        
+
         /// <summary>When the token was issued (UTC)</summary>
         [SwaggerSchema(Description = "Token issue timestamp (UTC)")]
         public DateTime issued_at { get; set; }
-        
+
         /// <summary>Human-readable expiration time</summary>
         [SwaggerSchema(Description = "Human-readable format of token expiration duration")]
         public string expires_in_human { get; set; }
-        
+
         /// <summary>Your custom expiration setting in minutes</summary>
         [SwaggerSchema(Description = "Custom expiration time you specified for manual refresh cycles")]
         public int custom_expires_in_minutes { get; set; }
-        
+
         /// <summary>When you should manually refresh the token (UTC)</summary>
         [SwaggerSchema(Description = "Recommended time to manually generate a new token (UTC)")]
         public DateTime custom_expires_at { get; set; }
-        
+
         /// <summary>Token refresh guidance message</summary>
         [SwaggerSchema(Description = "Guidance on when to refresh the token based on your settings")]
         public string token_refresh_guidance { get; set; }

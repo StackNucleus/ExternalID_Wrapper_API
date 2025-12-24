@@ -25,14 +25,14 @@ namespace OIDC_ExternalID_API
                 case "Token":
                     AddTokenControllerDocs(operation, actionName);
                     break;
-                case "CustomGraph":
-                    AddCustomGraphControllerDocs(operation, actionName);
+                case "DGraph":
+                    AddDGraphControllerDocs(operation, actionName);
                     break;
                 case "Graph":
                     AddGraphControllerDocs(operation, actionName);
                     break;
-                case "CustomTest":
-                    AddCustomTestControllerDocs(operation, actionName);
+                case "DGraph":
+                    AddDGraphControllerDocs(operation, actionName);
                     break;
             }
 
@@ -68,7 +68,7 @@ namespace OIDC_ExternalID_API
                         **Features:**
                         - Uses Azure AD OAuth 2.0 client credentials flow
                         - Supports Microsoft Graph API scopes
-                        - Works with both GraphController and CustomGraphController
+                        - Works with both GraphController and DGraphController
                         - Manual expiration time control for enhanced security
 
                         **Required Fields:**
@@ -153,7 +153,7 @@ namespace OIDC_ExternalID_API
 
                         **Supported Attributes:**
                         - `DisplayName`: User's display name
-                        - `JobTitle`: Job title  
+                        - `JobTitle`: Job title
                         - `Department`: Department
 
                         **Benefits:**
@@ -334,7 +334,9 @@ namespace OIDC_ExternalID_API
                                     };
                                     break;
 
-                                case "CustomGraph.UpdateUserAttributesByEmail":
+
+                                case "DGraph.UpdateUserAttributesByEmail":
+
                                     content.Value.Example = new OpenApiObject
                                     {
                                         ["DisplayName"] = new OpenApiString("John Doe"),
@@ -343,7 +345,9 @@ namespace OIDC_ExternalID_API
                                     };
                                     break;
 
-                                case "CustomGraph.ResetPasswordByEmail":
+
+                                case "DGraph.ResetPasswordByEmail":
+
                                     content.Value.Example = new OpenApiObject
                                     {
                                         ["passwordProfile"] = new OpenApiObject

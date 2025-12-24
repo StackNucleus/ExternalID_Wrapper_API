@@ -2,285 +2,185 @@
 
 A streamlined ASP.NET Core Web API for managing Azure AD users through Microsoft Graph API. This API provides secure user management operations with Azure AD token-based authentication.
 
-## Overview
+## 📋 Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Authentication](#authentication)
+- [API Endpoints](#api-endpoints)
+- [Configuration](#configuration)
+- [Getting Started](#getting-started)
+- [Usage Examples](#usage-examples)
+- [Swagger UI](#swagger-ui)
+- [Troubleshooting](#troubleshooting)
+- [Security](#security)
+- [Contributing](#contributing)
+- [License](#license)
+
+## 🔍 Overview
 
 This API enables secure user management operations in Azure AD External Identities through Microsoft Graph API integration. It supports user retrieval, updates, and deletion operations using flexible identifier types (Object ID, UPN, or Email).
 
 ### Key Features
 
-- Azure AD token generation for Microsoft Graph API access
-- User management operations (Get, Update, Delete)
-- Flexible user identification (Object ID, UPN, Email)
-- JWT Bearer token authentication
-- Comprehensive Swagger/OpenAPI documentation
-- Built with .NET 8.0 and C#
+- **Azure AD token generation** for Microsoft Graph API access
+- **User management operations** (Get, Update, Delete)
+- **Flexible user identification** (Object ID, UPN, Email)
+- **JWT Bearer token authentication**
+- **Comprehensive Swagger/OpenAPI documentation**
+- **Built with .NET 8.0** and C#
 
 ### Available Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/Token/Get AAD Token` | Generate Azure AD access token |
-| GET | `/Graph/getUserByIdentifier` | Retrieve user details by identifier |
-| PATCH | `/Graph/updateUserByIdentifier` | Update user attributes by identifier |
-| PATCH | `/Graph/updateUserAttributesByIdentifier` | Update specific user attributes by identifier |
-| DELETE | `/Graph/deleteUserByIdentifier` | Delete user by identifier |
+| POST | `/Token/getAAD-Token/v1.0` | Generate Azure AD access token |
+| GET | `/Graph/getUserByIdentifier/v1.0` | Retrieve user details by identifier |
+| PATCH | `/Graph/updateUserByIdentifier/v1.0` | Update user attributes by identifier |
+| PATCH | `/Graph/updateUserAttributesByIdentifier/v1.0` | Update specific user attributes |
+| DELETE | `/Graph/deleteUserByIdentifier/v1.0` | Delete user by identifier |
+| GET | `/DGraph/getUserByIdentifier/v1.0` | Retrieve user details (delegated permissions) |
+| PATCH | `/DGraph/updateUserByIdentifier/v1.0` | Update user attributes (delegated permissions) |
+| DELETE | `/DGraph/deleteUserByIdentifier/v1.0` | Delete user (delegated permissions) |
 
-### Technology Stack
-
-- **Framework**: ASP.NET Core 8.0
-- **Language**: C# 12
-- **Authentication**: JWT Bearer tokens (Azure AD)
-- **Graph Integration**: Microsoft Graph SDK v5.82.0
-- **Documentation**: Swagger/OpenAPI (Swashbuckle v7.0.0)
-- **Dependencies**:
-  - Azure.Identity v1.14.0
-  - Microsoft.AspNetCore.Authentication.JwtBearer v8.0.18
-  - Microsoft.Graph v5.82.0
-  - Newtonsoft.Json v13.0.3
-
-
-## Architecture
+## 🏗️ Architecture
 
 ### API Flow Diagram
 
-```mermaid
-graph TB
-    Client[Client Application]
-    
-    subgraph "API Layer"
-        TokenCtrl[TokenController]
-        GraphCtrl[GraphController]
-    end
-    
-    subgraph "Authentication"
-        JWTAuth[JWT Bearer Auth]
-        AzureAD[Azure AD]
-    end
-    
-    subgraph "External Services"
-        GraphAPI[Microsoft Graph API]
-    end
-    
-    Client -->|1. Get Token| TokenCtrl
-    TokenCtrl -->|2. Request Token| AzureAD
-    AzureAD -->|3. Return Token| TokenCtrl
-    TokenCtrl -->|4. Return Token| Client
-    
-    Client -->|5. API Request + Token| GraphCtrl
-    GraphCtrl -->|6. Validate Token| JWTAuth
-    JWTAuth -->|7. Validated| GraphCtrl
-    GraphCtrl -->|8. Graph API Call| GraphAPI
-    GraphAPI -->|9. User Data| GraphCtrl
-    GraphCtrl -->|10. Response| Client
+```
+┌─────────────────┐    1. Generate Token     ┌──────────────────┐
+│   Client App    │ ───────────────────────▶ │   Token Endpoint │
+└─────────────────┘                          └──────────────────┘
+         │                                           │
+         │    2. Include Bearer Token                │
+         ▼                                           ▼
+┌─────────────────┐    3. API Request      ┌──────────────────┐
+│   Client App    │ ───────────────────────▶ │  Graph Endpoints │
+└─────────────────┘                          └──────────────────┘
+         │                                           │
+         │    4. Microsoft Graph API Call            │
+         ▼                                           ▼
+┌─────────────────┐    5. Response         ┌──────────────────┐
+│   Client App    │ ◀─────────────────────── │  Microsoft Graph │
+└─────────────────┘                          └──────────────────┘
 ```
 
 ### Authentication Flow
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API
-    participant TokenEndpoint
-    participant AzureAD
-    participant GraphAPI
+1. **Token Generation**: Client requests Azure AD token using client credentials
+2. **Token Validation**: API validates the Azure AD token
+3. **Microsoft Graph Access**: API uses service credentials to access Microsoft Graph
+4. **Response**: API returns user data to client
 
-    Client->>TokenEndpoint: POST /Token/Get AAD Token
-    TokenEndpoint->>AzureAD: Request token (client credentials)
-    AzureAD-->>TokenEndpoint: Return access token
-    TokenEndpoint-->>Client: Return token response
-    
-    Client->>API: Request with Bearer token
-    API->>API: Validate Azure AD token
-    API->>GraphAPI: Call Microsoft Graph
-    GraphAPI-->>API: Return user data
-    API-->>Client: Return response
-```
+### Technology Stack
 
-### Endpoint Structure
+- **Framework**: ASP.NET Core 8.0
+- **Authentication**: JWT Bearer Tokens + Azure AD
+- **API Documentation**: Swagger/OpenAPI
+- **HTTP Client**: HttpClient with factory pattern
+- **Logging**: Microsoft.Extensions.Logging
+- **Configuration**: JSON configuration files
 
-```mermaid
-graph LR
-    API[API Root]
-    
-    API --> Token["Token"]
-    API --> Graph["Graph"]
-    
-    Token --> GetAAD[POST: Get AAD Token]
-    
-    Graph --> GetUser[GET: getUserByIdentifier]
-    Graph --> UpdateUser[PATCH: updateUserByIdentifier]
-    Graph --> UpdateAttr[PATCH: updateUserAttributesByIdentifier]
-    Graph --> DeleteUser[DELETE: deleteUserByIdentifier]
-```
+## 🔐 Authentication
 
+### Azure AD Token Generation
 
-## Authentication
+The API uses Azure AD tokens for authentication. Tokens are generated using the client credentials flow.
 
-All Graph API endpoints require Azure AD Bearer token authentication. You must first generate a token using the Token endpoint, then include it in the Authorization header for all subsequent requests.
+#### Required Parameters
 
-### Generating an Azure AD Token
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `client_id` | string | Your Azure AD application client ID |
+| `client_secret` | string | Your Azure AD application client secret |
+| `scope` | string | OAuth2 scope (default: `https://graph.microsoft.com/.default`) |
+| `expires_in_minutes` | int | Custom expiration time (1-1440 minutes, default: 60) |
 
-To access the Graph endpoints, you need to generate an Azure AD access token using your Azure AD application credentials.
+#### Example Request
 
-**Endpoint**: `POST /Token/Get AAD Token`
-
-**Request Body**:
 ```json
+POST /Token/getAAD-Token/v1.0
+Content-Type: application/json
+
 {
-  "client_id": "your-azure-ad-client-id",
-  "client_secret": "your-azure-ad-client-secret",
+  "client_id": "your-client-id",
+  "client_secret": "your-client-secret",
   "scope": "https://graph.microsoft.com/.default",
   "expires_in_minutes": 60
 }
 ```
 
-**Example Request**:
-```bash
-curl -X POST "https://your-api-url/Token/Get%20AAD%20Token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "client_id": "12345678-1234-1234-1234-123456789abc",
-    "client_secret": "your-secret-value",
-    "expires_in_minutes": 60
-  }'
-```
+#### Example Response
 
-**Example Response**:
 ```json
 {
-  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6Ik5HVEZ2ZEstZnl0aEV1Q...",
   "token_type": "Bearer",
-  "expires_in": 3599,
+  "expires_in": 3600,
   "scope": "https://graph.microsoft.com/.default",
-  "expires_at": "2025-11-25T15:30:00Z",
-  "issued_at": "2025-11-25T14:30:00Z",
-  "expires_in_human": "59 minutes 59 seconds",
+  "expires_at": "2025-09-11T15:30:00.000Z",
+  "issued_at": "2025-09-11T14:30:00.000Z",
+  "expires_in_human": "59 minute(s), 59 second(s)",
   "custom_expires_in_minutes": 60,
-  "custom_expires_at": "2025-11-25T15:30:00Z",
-  "token_refresh_guidance": "Token will expire in 60 minutes. Request a new token before expiration."
+  "custom_expires_at": "2025-09-11T15:30:00.000Z",
+  "token_refresh_guidance": "Recommended to refresh token after 60 minutes for security"
 }
 ```
 
 ### Using the Token in Requests
 
-Once you have the access token, include it in the Authorization header for all Graph API requests:
+Include the token in the Authorization header:
 
-**Header Format**:
-```
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
-```
-
-**Example Request with Token**:
-```bash
-curl -X GET "https://your-api-url/Graph/getUserByIdentifier?identifier=user@domain.com" \
-  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc..."
+```http
+GET /Graph/getUserByIdentifier/v1.0?identifier=user@domain.com
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6Ik5HVEZ2ZEstZnl0aEV1Q...
 ```
 
 ### Token Expiration
 
-- Azure AD tokens typically expire after 1 hour (3600 seconds)
-- The `expires_in_minutes` parameter allows you to specify a custom expiration time (1-1440 minutes)
-- Monitor the `expires_at` field in the token response
-- Request a new token before the current one expires
-- The API will return `401 Unauthorized` if the token is expired or invalid
+- **Azure AD tokens** expire after 1 hour by default
+- **Custom expiration** allows you to set shorter refresh cycles for enhanced security
+- **Automatic refresh** recommended 1-2 minutes before expiration
 
-### Authentication in Swagger UI
-
-1. Navigate to the Swagger UI at `https://your-api-url/swagger`
-2. Click the **Authorize** button (lock icon) at the top right
-3. Generate a token using the `/Token/Get AAD Token` endpoint
-4. Copy the `access_token` value from the response
-5. In the authorization dialog, enter: `Bearer <your-access-token>`
-6. Click **Authorize**
-7. All subsequent requests will include the token automatically
-
-
-## API Endpoints
+## 📡 API Endpoints
 
 ### 1. Generate Azure AD Token
 
-Generate an Azure AD access token for authenticating with the Graph API endpoints.
+**Endpoint**: `POST /Token/getAAD-Token/v1.0`
 
-**Endpoint**: `POST /Token/Get AAD Token`
-
-**Authentication**: None (this endpoint generates the token)
+Generates an Azure AD access token using client credentials flow.
 
 **Request Parameters**:
+- `client_id` (required): Azure AD application client ID
+- `client_secret` (required): Azure AD application client secret
+- `scope` (optional): OAuth2 scope (default: `https://graph.microsoft.com/.default`)
+- `expires_in_minutes` (optional): Custom expiration time (1-1440 minutes)
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| client_id | string | Yes | Azure AD application client ID |
-| client_secret | string | Yes | Azure AD application client secret |
-| scope | string | No | Token scope (default: `https://graph.microsoft.com/.default`) |
-| expires_in_minutes | integer | No | Custom expiration time in minutes (1-1440, default: 60) |
-
-**Request Body Example**:
-```json
-{
-  "client_id": "12345678-1234-1234-1234-123456789abc",
-  "client_secret": "your-secret-value",
-  "scope": "https://graph.microsoft.com/.default",
-  "expires_in_minutes": 60
-}
-```
-
-**Success Response (200 OK)**:
-```json
-{
-  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6...",
-  "token_type": "Bearer",
-  "expires_in": 3599,
-  "scope": "https://graph.microsoft.com/.default",
-  "expires_at": "2025-11-25T15:30:00Z",
-  "issued_at": "2025-11-25T14:30:00Z",
-  "expires_in_human": "59 minutes 59 seconds",
-  "custom_expires_in_minutes": 60,
-  "custom_expires_at": "2025-11-25T15:30:00Z",
-  "token_refresh_guidance": "Token will expire in 60 minutes. Request a new token before expiration."
-}
-```
-
-**Error Responses**:
-
-| Status Code | Description |
-|-------------|-------------|
-| 400 Bad Request | Invalid client credentials or parameters |
-| 500 Internal Server Error | Azure AD configuration error or service unavailable |
-
-**Error Response Example**:
-```json
-{
-  "error": "invalid_client",
-  "error_description": "AADSTS7000215: Invalid client secret provided."
-}
-```
-
----
+**Response Fields**:
+- `access_token`: The Azure AD access token
+- `token_type`: Always "Bearer"
+- `expires_in`: Token expiration in seconds
+- `scope`: Granted OAuth2 scope
+- `expires_at`: Absolute expiration time (UTC)
+- `issued_at`: Token issue time (UTC)
+- `expires_in_human`: Human-readable expiration duration
+- `custom_expires_in_minutes`: Your custom expiration setting
+- `custom_expires_at`: Recommended refresh time (UTC)
+- `token_refresh_guidance`: Refresh guidance message
 
 ### 2. Get User by Identifier
 
-Retrieve user details from Azure AD using Object ID, User Principal Name (UPN), or Email address.
+**Endpoint**: `GET /Graph/getUserByIdentifier/v1.0`
 
-**Endpoint**: `GET /Graph/getUserByIdentifier`
-
-**Authentication**: Required (Bearer token)
+Retrieves user details from Microsoft Graph API using flexible identifier types.
 
 **Query Parameters**:
+- `identifier` (required): User Object ID, UPN, or Email address
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| identifier | string | Yes | User Object ID, UPN, or Email address |
-
-**Request Example**:
-```bash
-GET /Graph/getUserByIdentifier?identifier=user@domain.com
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
-```
-
-**Success Response (200 OK)**:
+**Response Example**:
 ```json
 {
-  "id": "12345678-1234-1234-1234-123456789abc",
+  "id": "12345678-1234-1234-1234-123456789012",
   "userPrincipalName": "user@domain.com",
   "displayName": "John Doe",
   "givenName": "John",
@@ -288,206 +188,105 @@ Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
   "mail": "user@domain.com",
   "jobTitle": "Software Engineer",
   "officeLocation": "Building 1",
-  "mobilePhone": "+1234567890",
-  "businessPhones": ["+1234567890"],
+  "mobilePhone": "+1 555-123-4567",
+  "businessPhones": ["+1 555-987-6543"],
   "accountEnabled": true
 }
 ```
 
-**Error Responses**:
-
-| Status Code | Description |
-|-------------|-------------|
-| 400 Bad Request | Invalid identifier format |
-| 401 Unauthorized | Missing or invalid authentication token |
-| 404 Not Found | User not found |
-| 500 Internal Server Error | Graph API error |
-
-**Error Response Example**:
-```json
-{
-  "error": "user_not_found",
-  "error_description": "User with identifier 'user@domain.com' was not found."
-}
-```
-
----
-
 ### 3. Update User by Identifier
 
-Update user attributes in Azure AD using Object ID, User Principal Name (UPN), or Email address.
+**Endpoint**: `PATCH /Graph/updateUserByIdentifier/v1.0`
 
-**Endpoint**: `PATCH /Graph/updateUserByIdentifier`
-
-**Authentication**: Required (Bearer token)
+Updates user attributes using flexible identifier types.
 
 **Query Parameters**:
+- `identifier` (required): User Object ID, UPN, or Email address
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| identifier | string | Yes | User Object ID, UPN, or Email address |
-
-**Request Body Parameters**:
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| displayName | string | No | User's display name |
-| givenName | string | No | User's first name |
-| surname | string | No | User's last name |
-| jobTitle | string | No | User's job title |
-| department | string | No | User's department |
-| officeLocation | string | No | User's office location |
-| mobilePhone | string | No | User's mobile phone number |
-| businessPhones | array | No | User's business phone numbers |
-
-**Request Example**:
-```bash
-PATCH /Graph/updateUserByIdentifier?identifier=user@domain.com
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
-Content-Type: application/json
-
+**Request Body**:
+```json
 {
   "displayName": "Jane Smith",
   "jobTitle": "Senior Software Engineer",
-  "department": "Engineering"
+  "department": "Engineering",
+  "mobilePhone": "+1 555-555-5555"
 }
 ```
 
-**Success Response (200 OK)**:
+**Response Example**:
 ```json
 {
   "message": "User updated successfully",
-  "userId": "12345678-1234-1234-1234-123456789abc"
+  "userId": "12345678-1234-1234-1234-123456789012"
 }
 ```
-
-**Error Responses**:
-
-| Status Code | Description |
-|-------------|-------------|
-| 400 Bad Request | Invalid identifier or empty update data |
-| 401 Unauthorized | Missing or invalid authentication token |
-| 404 Not Found | User not found |
-| 500 Internal Server Error | Graph API error |
-
----
 
 ### 4. Update User Attributes by Identifier
 
-Update specific user attributes (firstName, lastName, displayName) in Azure AD using Object ID, User Principal Name (UPN), or Email address.
+**Endpoint**: `PATCH /Graph/updateUserAttributesByIdentifier/v1.0`
 
-**Endpoint**: `PATCH /Graph/updateUserAttributesByIdentifier`
-
-**Authentication**: Required (Bearer token)
+Updates specific user attributes using a structured model.
 
 **Query Parameters**:
+- `identifier` (required): User Object ID, UPN, or Email address
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| identifier | string | Yes | User Object ID, UPN, or Email address |
-
-**Request Body Parameters**:
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| firstName | string | No | User's first name (maps to givenName) |
-| lastName | string | No | User's last name (maps to surname) |
-| DisplayName | string | No | User's display name |
-
-**Request Example**:
-```bash
-PATCH /Graph/updateUserAttributesByIdentifier?identifier=user@domain.com
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
-Content-Type: application/json
-
-{
-  "firstName": "Jane",
-  "lastName": "Smith",
-  "DisplayName": "Jane Smith"
-}
-```
-
-**Success Response (200 OK)**:
+**Request Body**:
 ```json
 {
-  "message": "User attributes updated successfully",
-  "userId": "12345678-1234-1234-1234-123456789abc"
+  "firstName": "John",
+  "lastName": "Smith",
+  "DisplayName": "John Smith"
 }
 ```
-
-**Error Responses**:
-
-| Status Code | Description |
-|-------------|-------------|
-| 400 Bad Request | Invalid identifier or empty update model |
-| 401 Unauthorized | Missing or invalid authentication token |
-| 404 Not Found | User not found |
-| 500 Internal Server Error | Graph API error |
-
----
 
 ### 5. Delete User by Identifier
 
-Delete a user from Azure AD using Object ID, User Principal Name (UPN), or Email address.
+**Endpoint**: `DELETE /Graph/deleteUserByIdentifier/v1.0`
 
-**Endpoint**: `DELETE /Graph/deleteUserByIdentifier`
-
-**Authentication**: Required (Bearer token)
+Deletes a user from Microsoft Graph API.
 
 **Query Parameters**:
+- `identifier` (required): User Object ID, UPN, or Email address
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| identifier | string | Yes | User Object ID, UPN, or Email address |
-
-**Request Example**:
-```bash
-DELETE /Graph/deleteUserByIdentifier?identifier=user@domain.com
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
-```
-
-**Success Response (200 OK)**:
+**Response Example**:
 ```json
 {
   "message": "User deleted successfully",
-  "userId": "12345678-1234-1234-1234-123456789abc"
+  "userId": "12345678-1234-1234-1234-123456789012"
 }
 ```
 
-**Error Responses**:
+### 6. DGraphController Endpoints (Delegated Permissions)
 
-| Status Code | Description |
-|-------------|-------------|
-| 400 Bad Request | Invalid identifier format |
-| 401 Unauthorized | Missing or invalid authentication token |
-| 404 Not Found | User not found |
-| 500 Internal Server Error | Graph API error |
+The DGraphController provides the same endpoints as GraphController but uses delegated permissions with the authenticated user's token directly.
 
+**Available Endpoints**:
+- `GET /DGraph/getUserByIdentifier/v1.0`
+- `PATCH /DGraph/updateUserByIdentifier/v1.0`
+- `DELETE /DGraph/deleteUserByIdentifier/v1.0`
 
-## Configuration
+**Key Differences**:
+- Uses the authenticated user's access token directly with Microsoft Graph API
+- Supports delegated permissions model
+- Requires user-level permissions instead of application permissions
+
+## ⚙️ Configuration
 
 ### Required Configuration
 
-The API requires Azure AD configuration to authenticate and access Microsoft Graph API. Configuration can be provided through `appsettings.json` or environment variables.
-
-### appsettings.json Structure
-
-Create or update your `appsettings.json` file with the following structure:
+The API requires Azure AD configuration in `appsettings.json`:
 
 ```json
 {
   "AzureAd": {
-    "TenantId": "your-tenant-id",
-    "ClientId": "your-client-id",
-    "ClientSecret": "your-client-secret",
-    "Instance": "https://login.microsoftonline.com/",
-    "Domain": "yourdomain.onmicrosoft.com"
+    "TenantId": "yourdomain.onmicrosoft.com",
+    "ClientId": "your-azure-ad-client-id",
+    "ClientSecret": "your-azure-ad-client-secret"
   },
   "Logging": {
     "LogLevel": {
       "Default": "Information",
-      "Microsoft.AspNetCore": "Warning",
-      "Microsoft.Graph": "Information"
+      "Microsoft.AspNetCore": "Warning"
     }
   },
   "AllowedHosts": "*"
@@ -496,129 +295,42 @@ Create or update your `appsettings.json` file with the following structure:
 
 ### Configuration Values Explained
 
-| Configuration Key | Description | Example | Required |
-|-------------------|-------------|---------|----------|
-| `AzureAd:TenantId` | Your Azure AD tenant ID (GUID) | `12345678-1234-1234-1234-123456789abc` | Yes |
-| `AzureAd:ClientId` | Azure AD application (client) ID | `87654321-4321-4321-4321-cba987654321` | Yes |
-| `AzureAd:ClientSecret` | Azure AD application client secret | `your-secret-value` | Yes |
-| `AzureAd:Instance` | Azure AD instance URL | `https://login.microsoftonline.com/` | No (has default) |
-| `AzureAd:Domain` | Your Azure AD domain | `yourdomain.onmicrosoft.com` | No |
-
-### Environment Variables (Alternative)
-
-You can also configure the API using environment variables, which is recommended for production deployments:
-
-```bash
-# Azure AD Configuration
-export AzureAd__TenantId="your-tenant-id"
-export AzureAd__ClientId="your-client-id"
-export AzureAd__ClientSecret="your-client-secret"
-export AzureAd__Instance="https://login.microsoftonline.com/"
-export AzureAd__Domain="yourdomain.onmicrosoft.com"
-
-# Logging Configuration
-export Logging__LogLevel__Default="Information"
-export Logging__LogLevel__Microsoft__AspNetCore="Warning"
-```
-
-**Note**: Environment variables use double underscores (`__`) to represent nested configuration levels.
+| Setting | Description |
+|---------|-------------|
+| `TenantId` | Your Azure AD tenant identifier (domain name or GUID) |
+| `ClientId` | Application ID from your Azure AD app registration |
+| `ClientSecret` | Client secret from your Azure AD app registration |
 
 ### Azure AD App Registration Setup
 
-To obtain the required configuration values, you need to register an application in Azure AD:
-
-1. **Navigate to Azure Portal**:
-   - Go to [Azure Portal](https://portal.azure.com)
-   - Navigate to **Azure Active Directory** > **App registrations**
-
-2. **Create New Registration**:
-   - Click **New registration**
-   - Enter a name for your application (e.g., "OIDC External ID API")
-   - Select supported account types (typically "Single tenant")
-   - Click **Register**
-
-3. **Copy Application IDs**:
-   - From the **Overview** page, copy:
-     - **Application (client) ID** → Use as `AzureAd:ClientId`
-     - **Directory (tenant) ID** → Use as `AzureAd:TenantId`
-
-4. **Create Client Secret**:
-   - Go to **Certificates & secrets** > **Client secrets**
-   - Click **New client secret**
-   - Add a description and select expiration period
-   - Click **Add**
-   - **Copy the secret value immediately** → Use as `AzureAd:ClientSecret`
-   - ⚠️ You won't be able to see the secret value again
-
-5. **Configure API Permissions**:
-   - Go to **API permissions**
-   - Click **Add a permission** > **Microsoft Graph** > **Application permissions**
-   - Add the following permissions:
-     - `User.Read.All` - Read all users' full profiles
-     - `User.ReadWrite.All` - Read and write all users' full profiles
-     - `Directory.ReadWrite.All` - Read and write directory data (for delete operations)
-   - Click **Add permissions**
-   - Click **Grant admin consent for [Your Tenant]**
+1. **Register Application**: In Azure Portal, register a new application
+2. **Generate Client Secret**: Create a client secret for authentication
+3. **Configure API Permissions**: Add Microsoft Graph permissions
+4. **Grant Admin Consent**: Approve permissions for your tenant
 
 ### Required Microsoft Graph Permissions
 
-| Permission | Type | Description | Used By |
-|------------|------|-------------|---------|
-| `User.Read.All` | Application | Read all users' full profiles | getUserByIdentifier |
-| `User.ReadWrite.All` | Application | Read and write all users' full profiles | updateUserByIdentifier, updateUserAttributesByIdentifier |
-| `Directory.ReadWrite.All` | Application | Read and write directory data | deleteUserByIdentifier |
+| Permission | Type | Description |
+|------------|------|-------------|
+| `User.Read.All` | Application | Read all users' full profiles |
+| `User.ReadWrite.All` | Application | Read and write all users' full profiles |
+| `Directory.Read.All` | Application | Read directory data |
 
-### Security Best Practices
-
-1. **Never commit secrets to source control**
-   - Add `appsettings.json` to `.gitignore` if it contains secrets
-   - Use `appsettings.Development.json` for local development
-   - Use environment variables or Azure Key Vault for production
-
-2. **Rotate client secrets regularly**
-   - Set expiration dates on client secrets
-   - Update secrets before they expire
-   - Use Azure Key Vault for automated rotation
-
-3. **Use least privilege principle**
-   - Only grant the minimum required permissions
-   - Use application permissions (not delegated) for service-to-service calls
-
-4. **Enable HTTPS only**
-   - Always use HTTPS in production
-   - Configure HSTS (HTTP Strict Transport Security)
-
-
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
-Before you begin, ensure you have the following installed and configured:
-
-- **.NET 8.0 SDK** or later
-  - Download from [dotnet.microsoft.com](https://dotnet.microsoft.com/download)
-  - Verify installation: `dotnet --version`
-
-- **Azure AD Tenant** with administrative access
-  - Required to create app registrations
-  - Required to grant API permissions
-
-- **Development Tools** (choose one):
-  - Visual Studio 2022 or later
-  - Visual Studio Code with C# extension
-  - JetBrains Rider
-
-- **API Testing Tool** (optional but recommended):
-  - Postman, Insomnia, or curl
-  - Or use the built-in Swagger UI
+- .NET 8.0 SDK
+- Azure AD tenant with appropriate permissions
+- Microsoft Graph API access
 
 ### Installation Steps
 
-#### 1. Clone or Download the Repository
+#### 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
-cd OIDC_ExternalID_API
+cd Wrapper-API-Modifications
 ```
 
 #### 2. Restore NuGet Packages
@@ -629,19 +341,17 @@ dotnet restore
 
 #### 3. Configure Azure AD Settings
 
-Create or update `appsettings.Development.json` in the project root:
+Update `appsettings.json` with your Azure AD configuration:
 
 ```json
 {
   "AzureAd": {
-    "TenantId": "your-tenant-id",
-    "ClientId": "your-client-id",
-    "ClientSecret": "your-client-secret"
+    "TenantId": "yourdomain.onmicrosoft.com",
+    "ClientId": "your-azure-ad-client-id",
+    "ClientSecret": "your-azure-ad-client-secret"
   }
 }
 ```
-
-Replace the placeholder values with your Azure AD app registration details (see [Configuration](#configuration) section for setup instructions).
 
 #### 4. Build the Project
 
@@ -649,383 +359,311 @@ Replace the placeholder values with your Azure AD app registration details (see 
 dotnet build
 ```
 
-Verify that the build completes without errors.
-
 #### 5. Run the API
 
 ```bash
 dotnet run
 ```
 
-The API will start and display the URLs it's listening on:
-
-```
-info: Microsoft.Hosting.Lifetime[14]
-      Now listening on: https://localhost:7001
-info: Microsoft.Hosting.Lifetime[14]
-      Now listening on: http://localhost:5000
-```
+The API will start on `https://localhost:7110` by default.
 
 ### Making Your First API Call
 
 #### Step 1: Generate an Azure AD Token
 
-Use curl, Postman, or Swagger UI to generate a token:
-
-**Using curl**:
 ```bash
-curl -X POST "https://localhost:7001/Token/Get%20AAD%20Token" \
+curl -X POST "https://localhost:7110/Token/getAAD-Token/v1.0" \
   -H "Content-Type: application/json" \
   -d '{
     "client_id": "your-client-id",
     "client_secret": "your-client-secret",
+    "scope": "https://graph.microsoft.com/.default",
     "expires_in_minutes": 60
   }'
 ```
 
-**Using PowerShell**:
-```powershell
-$body = @{
-    client_id = "your-client-id"
-    client_secret = "your-client-secret"
-    expires_in_minutes = 60
-} | ConvertTo-Json
+#### Step 2: Use the Token to Get a User
 
-Invoke-RestMethod -Uri "https://localhost:7001/Token/Get%20AAD%20Token" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body $body
-```
-
-**Response**:
-```json
-{
-  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-  "token_type": "Bearer",
-  "expires_in": 3599,
-  "expires_in_human": "59 minutes 59 seconds"
-}
-```
-
-Copy the `access_token` value for the next step.
-
-#### Step 2: Call a Graph Endpoint
-
-Use the token to retrieve a user:
-
-**Using curl**:
 ```bash
-curl -X GET "https://localhost:7001/Graph/getUserByIdentifier?identifier=user@domain.com" \
-  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc..."
-```
-
-**Using PowerShell**:
-```powershell
-$token = "eyJ0eXAiOiJKV1QiLCJhbGc..."
-$headers = @{
-    Authorization = "Bearer $token"
-}
-
-Invoke-RestMethod -Uri "https://localhost:7001/Graph/getUserByIdentifier?identifier=user@domain.com" `
-  -Method Get `
-  -Headers $headers
-```
-
-**Response**:
-```json
-{
-  "id": "12345678-1234-1234-1234-123456789abc",
-  "userPrincipalName": "user@domain.com",
-  "displayName": "John Doe",
-  "givenName": "John",
-  "surname": "Doe",
-  "mail": "user@domain.com"
-}
+curl -X GET "https://localhost:7110/Graph/getUserByIdentifier/v1.0?identifier=user@domain.com" \
+  -H "Authorization: Bearer <your-access-token>"
 ```
 
 ### Using Swagger UI
 
-The easiest way to test the API is through the built-in Swagger UI:
+1. **Access Swagger UI**: Navigate to `https://localhost:7110/swagger`
+2. **Generate Token**: Use the token endpoint to get an access token
+3. **Authorize**: Click "Authorize" and enter `Bearer <your-token>`
+4. **Test Endpoints**: Try the Graph endpoints with your token
 
-1. **Open Swagger UI**:
-   - Navigate to `https://localhost:7001/swagger` in your browser
-   - You'll see all available endpoints
+## 📚 Usage Examples
 
-2. **Generate a Token**:
-   - Expand the `POST /Token/Get AAD Token` endpoint
-   - Click **Try it out**
-   - Fill in your `client_id` and `client_secret`
-   - Click **Execute**
-   - Copy the `access_token` from the response
+### cURL Examples
 
-3. **Authorize Swagger**:
-   - Click the **Authorize** button (lock icon) at the top right
-   - Enter: `Bearer <your-access-token>`
-   - Click **Authorize**, then **Close**
+#### Generate Token
 
-4. **Test Endpoints**:
-   - All Graph endpoints are now authorized
-   - Expand any endpoint (e.g., `GET /Graph/getUserByIdentifier`)
-   - Click **Try it out**
-   - Enter the required parameters
-   - Click **Execute**
-   - View the response
+```bash
+# Generate Azure AD token
+curl -X POST "https://localhost:7110/Token/getAAD-Token/v1.0" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_id": "your-client-id",
+    "client_secret": "your-client-secret",
+    "scope": "https://graph.microsoft.com/.default",
+    "expires_in_minutes": 60
+  }'
+```
 
-### Quick Start Checklist
+#### Get User
 
-- [ ] .NET 8.0 SDK installed
-- [ ] Azure AD app registration created
-- [ ] API permissions granted and admin consent provided
-- [ ] `appsettings.Development.json` configured with Azure AD credentials
-- [ ] Project builds successfully (`dotnet build`)
-- [ ] API runs successfully (`dotnet run`)
-- [ ] Token generated successfully via `/Token/Get AAD Token`
-- [ ] Graph endpoint called successfully with token
-- [ ] Swagger UI accessible and functional
+```bash
+# Get user by email
+curl -X GET "https://localhost:7110/Graph/getUserByIdentifier/v1.0?identifier=user@domain.com" \
+  -H "Authorization: Bearer <your-token>"
 
-### Next Steps
+# Get user by Object ID
+curl -X GET "https://localhost:7110/Graph/getUserByIdentifier/v1.0?identifier=12345678-1234-1234-1234-123456789012" \
+  -H "Authorization: Bearer <your-token>"
+```
 
-- Review the [API Endpoints](#api-endpoints) section for detailed endpoint documentation
-- Check the [Troubleshooting](#troubleshooting) section if you encounter issues
-- Configure production settings using environment variables
-- Set up logging and monitoring for production deployments
+#### Update User
 
+```bash
+# Update user attributes
+curl -X PATCH "https://localhost:7110/Graph/updateUserByIdentifier/v1.0?identifier=user@domain.com" \
+  -H "Authorization: Bearer <your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayName": "Jane Doe",
+    "jobTitle": "Senior Developer",
+    "department": "Engineering"
+  }'
+```
 
-## Troubleshooting
+#### Delete User
 
-This section covers common issues and their solutions. For detailed information about the API cleanup process, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+```bash
+# Delete user
+curl -X DELETE "https://localhost:7110/Graph/deleteUserByIdentifier/v1.0?identifier=user@domain.com" \
+  -H "Authorization: Bearer <your-token>"
+```
 
-### Common Authentication Errors
+### JavaScript Example
 
-#### Error: "401 Unauthorized"
+```javascript
+class OIDCAPI {
+    constructor(baseUrl, clientId, clientSecret) {
+        this.baseUrl = baseUrl;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+        this.token = null;
+    }
 
-**Symptoms**:
-- Graph endpoints return 401 status code
-- Error message: "Unauthorized" or "No authenticationScheme was specified"
+    async generateToken() {
+        const response = await fetch(`${this.baseUrl}/Token/getAAD-Token/v1.0`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: this.clientId,
+                client_secret: this.clientSecret,
+                scope: 'https://graph.microsoft.com/.default',
+                expires_in_minutes: 60
+            })
+        });
 
-**Possible Causes & Solutions**:
+        const tokenData = await response.json();
+        this.token = tokenData.access_token;
+        return tokenData;
+    }
 
-1. **Missing Authorization Header**
-   - Ensure you include the `Authorization` header in your request
-   - Format: `Authorization: Bearer <your-access-token>`
+    async getUser(identifier) {
+        if (!this.token) await this.generateToken();
 
-2. **Expired Token**
-   - Azure AD tokens typically expire after 1 hour
-   - Generate a new token using `/Token/Get AAD Token`
-   - Check the `expires_at` field in the token response
+        const response = await fetch(`${this.baseUrl}/Graph/getUserByIdentifier/v1.0?identifier=${encodeURIComponent(identifier)}`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
 
-3. **Invalid Token Format**
-   - Ensure the token is prefixed with "Bearer "
-   - Example: `Bearer eyJ0eXAiOiJKV1Qi...`
-   - Don't include quotes around the token
+        return await response.json();
+    }
 
-4. **Token from Wrong Tenant**
-   - Verify the token was generated for the correct Azure AD tenant
-   - Check the `tid` claim in the token (decode at [jwt.ms](https://jwt.ms))
+    async updateUser(identifier, updates) {
+        if (!this.token) await this.generateToken();
 
-#### Error: "AADSTS7000215: Invalid client secret provided"
+        const response = await fetch(`${this.baseUrl}/Graph/updateUserByIdentifier/v1.0?identifier=${encodeURIComponent(identifier)}`, {
+            method: 'PATCH',
+            headers: { 
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updates)
+        });
 
-**Symptoms**:
-- Token generation fails with this error
-- `/Token/Get AAD Token` returns 400 status code
+        return await response.json();
+    }
+}
 
-**Solutions**:
-1. Verify the `client_secret` in your request matches the Azure AD app registration
-2. Check if the client secret has expired in Azure Portal
-3. Generate a new client secret if needed
-4. Ensure there are no extra spaces or characters in the secret
+// Usage
+const api = new OIDCAPI('https://localhost:7110', 'your-client-id', 'your-client-secret');
+await api.generateToken();
+const user = await api.getUser('user@domain.com');
+console.log(user);
+```
 
-#### Error: "AADSTS700016: Application not found"
+## 🎨 Swagger UI
 
-**Symptoms**:
-- Token generation fails
-- Error mentions application with identifier not found
+The API includes enhanced Swagger UI features:
 
-**Solutions**:
-1. Verify the `client_id` is correct
-2. Ensure the app registration exists in the correct Azure AD tenant
-3. Check that you're using the Application (client) ID, not the Object ID
+### Features
+- **Interactive Documentation**: Test endpoints directly in the browser
+- **Authentication Support**: Easy token authorization
+- **Request/Response Examples**: Clear examples for all endpoints
+- **Real-time Testing**: Execute requests and see responses immediately
 
-### Common Graph API Errors
+### Accessing Swagger UI
+1. Start the API: `dotnet run`
+2. Open browser: `https://localhost:7110/swagger`
+3. Explore endpoints and test functionality
 
-#### Error: "404 Not Found - User not found"
+### Using Swagger UI for Authentication
+1. **Generate Token**: Use the Token endpoint to get an access token
+2. **Authorize**: Click the "Authorize" button
+3. **Enter Token**: Paste `Bearer <your-token>` in the authorization field
+4. **Test Endpoints**: All Graph endpoints will now include your token
 
-**Symptoms**:
-- Graph endpoints return 404 status code
-- Error message indicates user doesn't exist
+## 🔧 Troubleshooting
 
-**Solutions**:
-1. Verify the user identifier (Object ID, UPN, or Email) is correct
-2. Check if the user exists in Azure AD Portal
-3. Ensure the user is in the same tenant as your app registration
-4. Try using the Object ID instead of email or UPN
+### Common Issues
 
-#### Error: "403 Forbidden - Insufficient privileges"
+#### 401 Unauthorized
+**Cause**: Missing or invalid Azure AD token
+**Solution**: 
+1. Generate a new token using the Token endpoint
+2. Verify the token format: `Bearer <access_token>`
+3. Check token expiration
 
-**Symptoms**:
-- Graph endpoints return 403 status code
-- Error message about insufficient privileges
+#### 404 Not Found
+**Cause**: User not found in Azure AD
+**Solution**: 
+1. Verify the identifier is correct
+2. Check if user exists in Azure AD
+3. Try different identifier types (Object ID, UPN, Email)
 
-**Solutions**:
-1. Verify API permissions in Azure AD app registration:
-   - `User.Read.All` for read operations
-   - `User.ReadWrite.All` for update operations
-   - `Directory.ReadWrite.All` for delete operations
-2. Ensure admin consent has been granted for the permissions
-3. Wait a few minutes after granting permissions for changes to propagate
+#### 403 Forbidden
+**Cause**: Insufficient permissions
+**Solution**: 
+1. Verify Azure AD app has required permissions
+2. Ensure admin consent is granted
+3. Check permission types (Application vs Delegated)
 
-#### Error: "400 Bad Request - Invalid identifier"
+#### Configuration Errors
+**Cause**: Missing or incorrect Azure AD configuration
+**Solution**: 
+1. Verify `appsettings.json` has correct values
+2. Check Azure AD app registration
+3. Ensure client secret is valid
 
-**Symptoms**:
-- Graph endpoints return 400 status code
-- Error about invalid identifier format
+### Error Response Format
 
-**Solutions**:
-1. Ensure the identifier is not empty or null
-2. Verify the identifier format:
-   - Object ID: GUID format (e.g., `12345678-1234-1234-1234-123456789abc`)
-   - UPN: email format (e.g., `user@domain.com`)
-   - Email: valid email address
-3. URL-encode special characters in the identifier
-
-#### Error: "Request_ResourceNotFound"
-
-**Symptoms**:
-- Microsoft Graph returns this error code
-- User operations fail
-
-**Solutions**:
-1. The user may have been deleted
-2. The identifier may be incorrect
-3. Try searching for the user in Azure AD Portal to verify existence
-
-### Configuration Issues
-
-#### Error: "Configuration section 'AzureAd' not found"
-
-**Symptoms**:
-- API fails to start
-- Error about missing configuration
-
-**Solutions**:
-1. Ensure `appsettings.json` or `appsettings.Development.json` exists
-2. Verify the `AzureAd` section is present in the configuration file
-3. Check that all required fields are present:
-   - `TenantId`
-   - `ClientId`
-   - `ClientSecret`
-
-#### Error: "Unable to resolve service for type 'Microsoft.Graph.GraphServiceClient'"
-
-**Symptoms**:
-- API fails to start
-- Dependency injection error
-
-**Solutions**:
-1. Ensure all NuGet packages are restored: `dotnet restore`
-2. Verify `Microsoft.Graph` package is installed
-3. Check that `Program.cs` registers the GraphServiceClient
-
-### SSL/Certificate Issues
-
-#### Error: "The SSL connection could not be established"
-
-**Symptoms**:
-- Cannot connect to the API via HTTPS
-- Certificate validation errors
-
-**Solutions**:
-1. **For Development**:
-   - Trust the development certificate: `dotnet dev-certs https --trust`
-   - Restart your browser/API client
-
-2. **For Production**:
-   - Ensure a valid SSL certificate is installed
-   - Configure the certificate in your hosting environment
-
-### Swagger UI Issues
-
-#### Issue: "Authorize button doesn't work"
-
-**Solutions**:
-1. Generate a token first using `/Token/Get AAD Token`
-2. Copy the entire `access_token` value (not the whole response)
-3. In the Authorize dialog, enter: `Bearer <token>`
-4. Ensure there's a space between "Bearer" and the token
-
-#### Issue: "Endpoints return 401 even after authorizing"
-
-**Solutions**:
-1. Check if the token has expired
-2. Generate a new token and re-authorize
-3. Clear browser cache and cookies
-4. Try in an incognito/private browser window
-
-### Performance Issues
-
-#### Issue: "Slow response times from Graph endpoints"
-
-**Solutions**:
-1. Check your internet connection to Azure services
-2. Verify Azure AD service health in Azure Portal
-3. Consider implementing caching for frequently accessed users
-4. Check if you're hitting Microsoft Graph throttling limits
+```json
+{
+  "error": "error_code",
+  "error_description": "Detailed error message",
+  "error_codes": [error_code_numbers],
+  "timestamp": "2025-09-11T14:30:00.0000000Z",
+  "trace_id": "12345678-1234-1234-1234-123456789012",
+  "correlation_id": "12345678-1234-1234-1234-123456789012"
+}
+```
 
 ### Logging and Diagnostics
 
-#### Enable Detailed Logging
-
-To troubleshoot issues, enable detailed logging in `appsettings.json`:
+Enable detailed logging in `appsettings.json`:
 
 ```json
 {
   "Logging": {
     "LogLevel": {
       "Default": "Debug",
-      "Microsoft.AspNetCore": "Debug",
+      "Microsoft.AspNetCore": "Warning",
       "Microsoft.Graph": "Debug"
     }
   }
 }
 ```
 
-#### View Application Logs
+### Getting Help
 
-**Console Output**:
-- Logs are written to the console when running with `dotnet run`
-- Look for error messages and stack traces
+1. **Check Logs**: Review application logs for detailed error information
+2. **Verify Configuration**: Double-check Azure AD settings
+3. **Test with Postman**: Use Postman to isolate issues
+4. **Azure AD Portal**: Check app registration and permissions
 
-**Log Files** (if configured):
-- Check your logging provider configuration
-- Review log files for detailed error information
+## 🔒 Security
 
-### Getting Additional Help
+### Best Practices
 
-If you continue to experience issues:
+1. **Secure Client Secrets**: Never commit client secrets to version control
+2. **Use HTTPS**: Always use HTTPS in production
+3. **Token Expiration**: Implement token refresh cycles
+4. **Least Privilege**: Grant minimal required permissions
+5. **Input Validation**: Validate all user inputs
+6. **Error Handling**: Don't expose sensitive information in error messages
 
-1. **Check the detailed troubleshooting guide**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-2. **Review Azure AD app registration**:
-   - Verify all settings in Azure Portal
-   - Check API permissions and admin consent
-3. **Test with Microsoft Graph Explorer**:
-   - Visit [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer)
-   - Test the same operations to isolate API vs. Graph issues
-4. **Check Microsoft Graph API status**:
-   - Visit [Azure Status](https://status.azure.com)
-   - Check for any service outages
-5. **Review application logs**:
-   - Enable detailed logging
-   - Look for specific error messages and stack traces
+### Token Security
 
-### Common Error Codes Reference
+- **Short Expiration**: Use shorter token expiration times for high-security scenarios
+- **Secure Storage**: Store tokens securely, never in plain text
+- **Transmission**: Always use HTTPS for token transmission
+- **Logging**: Never log tokens or sensitive credentials
 
-| Error Code | Description | Common Solution |
-|------------|-------------|-----------------|
-| 400 | Bad Request | Check request parameters and body format |
-| 401 | Unauthorized | Verify token is valid and not expired |
-| 403 | Forbidden | Check API permissions and admin consent |
-| 404 | Not Found | Verify user exists and identifier is correct |
-| 429 | Too Many Requests | Implement retry logic with exponential backoff |
-| 500 | Internal Server Error | Check application logs for details |
-| 503 | Service Unavailable | Azure AD or Graph API may be experiencing issues |
+### Azure AD Security
 
+- **App Registration**: Use dedicated app registrations for different environments
+- **Permissions**: Grant only necessary Microsoft Graph permissions
+- **Admin Consent**: Control who can grant admin consent
+- **Monitoring**: Monitor Azure AD logs for suspicious activity
+
+## 🤝 Contributing
+
+### Development Setup
+
+1. **Fork the Repository**: Create your own fork
+2. **Clone Locally**: `git clone <your-fork>`
+3. **Install Dependencies**: `dotnet restore`
+4. **Build Project**: `dotnet build`
+5. **Run Tests**: `dotnet test` (if available)
+
+### Code Guidelines
+
+- Follow .NET naming conventions
+- Include XML documentation for public APIs
+- Write unit tests for new functionality
+- Maintain backward compatibility
+- Use meaningful commit messages
+
+### Pull Request Process
+
+1. Create feature branch: `git checkout -b feature/your-feature`
+2. Commit changes: `git commit -m "Add your feature"`
+3. Push to branch: `git push origin feature/your-feature`
+4. Create Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 📞 Support
+
+For support and questions:
+
+1. **Documentation**: Check this README for comprehensive information
+2. **Swagger UI**: Use the interactive API documentation
+3. **Azure AD Documentation**: Refer to Microsoft's Azure AD documentation
+4. **Microsoft Graph Documentation**: Check Microsoft Graph API documentation
+
+---
+
+**Note**: This API is designed for managing Azure AD External Identities and requires appropriate Azure AD permissions and configuration.
+```
+
+<tool_call>

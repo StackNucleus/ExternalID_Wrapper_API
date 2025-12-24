@@ -31,9 +31,6 @@ namespace OIDC_ExternalID_API
                 case "Graph":
                     AddGraphControllerDocs(operation, actionName);
                     break;
-                case "DGraph":
-                    AddDGraphControllerDocs(operation, actionName);
-                    break;
             }
 
             // Add common examples for all operations

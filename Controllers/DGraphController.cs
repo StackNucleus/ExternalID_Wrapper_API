@@ -310,10 +310,175 @@ namespace OIDC_ExternalID_API.Controllers
             }
         }
 
+        [HttpPatch("updateUserAttributesByIdentifier/v1.0")]
+        [Authorize]
+        [ProducesResponseType(200)]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(500)]
+        [SwaggerOperation(
+            Summary = "Update Specific User Attributes by ID, UPN, or Email (Delegated Permissions)",
+            Description = "Update specific user attributes (firstName, lastName, displayName, etc.) using a structured model with delegated permissions. Type-safe updates with validation.",
+            OperationId = "UpdateUserAttributesByIdentifierDelegated",
+            Tags = new[] { "CustomTest" }
+        )]
+        [SwaggerResponse(200, "User updated successfully")]
+        [SwaggerResponse(401, "Unauthorized - Bearer token required")]
+        [SwaggerResponse(404, "User not found")]
+        [SwaggerResponse(500, "Internal server error")]
+        public async Task<IActionResult> UpdateUserAttributesByIdentifier(
+            [FromQuery]
+            [SwaggerParameter("User Object ID, User Principal Name (UPN), or Email address", Required = true)]
+            string identifier,
+            [FromBody] UserUpdateModel updates)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(identifier))
+                {
+                    return BadRequest("Identifier parameter is required");
+                }
+
+                if (updates == null)
+                {
+                    return BadRequest("Update data is required");
+                }
+
+                // Get the access token from the authenticated user
+                var accessToken = GetAccessTokenFromRequest();
+                if (string.IsNullOrEmpty(accessToken))
+                {
+                    return Unauthorized("Access token not found in Authorization header");
+                }
+
+                // First, try to get user info from the token itself (same logic as getUserByIdentifier)
+                var userFromToken = GetUserFromToken(accessToken);
+                User user = null;
+
+                if (userFromToken != null)
+                {
+                    // If identifier matches token info, get full details from Azure AD
+                    if (identifier == userFromToken.UserPrincipalName ||
+                        identifier == userFromToken.Email ||
+                        identifier == userFromToken.ObjectId)
+                    {
+                        // Get full user details from Azure AD using the object ID from token
+                        user = await GetFullUserFromAzureAD(userFromToken.ObjectId, accessToken);
+                        if (user != null)
+                        {
+                            // Found user via token, proceed with update
+                        }
+                    }
+                    // Special case: if identifier is an email that matches token's email but user not found in AD
+                    else if (identifier == userFromToken.Email && identifier.Contains("@"))
+                    {
+                        _logger.LogInformation("Email {Email} from token not found in AD, trying with token's object ID {ObjectId}",
+                            identifier, userFromToken.ObjectId);
+                        // Try to get user by object ID from token
+                        user = await GetFullUserFromAzureAD(userFromToken.ObjectId, accessToken);
+                        if (user != null)
+                        {
+                            // Found user via token fallback, proceed with update
+                        }
+                    }
+                }
+
+                // If not found in token or identifier doesn't match, search Azure AD
+                if (user == null)
+                {
+                    user = await FindUserByIdentifierAsync(identifier, accessToken);
+                    if (user == null)
+                    {
+                        return NotFound("User not found.");
+                    }
+                }
+
+                string userId = user.Id;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    _logger.LogWarning("Found user object but ID is null for identifier: {Identifier}", identifier);
+                    return NotFound("User not found.");
+                }
+
+                // Build the update request using the structured model
+                var updateRequest = new Dictionary<string, object>();
+
+                if (!string.IsNullOrEmpty(updates.firstName))
+                    updateRequest["givenName"] = updates.firstName;
+                if (!string.IsNullOrEmpty(updates.lastName))
+                    updateRequest["surname"] = updates.lastName;
+                if (!string.IsNullOrEmpty(updates.DisplayName))
+                    updateRequest["displayName"] = updates.DisplayName;
+
+                if (updateRequest.Count == 0)
+                {
+                    return BadRequest("No valid properties to update");
+                }
+
+                // Update user using delegated permissions
+                using var updateClient = _httpClientFactory.CreateClient();
+                updateClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+                var updateContent = new StringContent(JsonSerializer.Serialize(updateRequest), System.Text.Encoding.UTF8, "application/json");
+                _logger.LogDebug("Update attributes request for user {UserId}: {UpdateContent}", userId, await updateContent.ReadAsStringAsync());
+                var updateResponse = await updateClient.PatchAsync($"https://graph.microsoft.com/v1.0/users/{userId}", updateContent);
+
+                if (updateResponse.IsSuccessStatusCode)
+                {
+                    return Ok($"User attributes updated successfully.");
+                }
+                else
+                {
+                    var errorContent = await updateResponse.Content.ReadAsStringAsync();
+                    _logger.LogError("Update attributes failed for user {UserId}: {StatusCode} - {ErrorContent}", userId, updateResponse.StatusCode, errorContent);
+
+                    try
+                    {
+                        var errorData = JsonSerializer.Deserialize<ODataError>(errorContent);
+                        if (errorData?.Error != null)
+                        {
+                            // Provide specific guidance for common errors
+                            if (errorData.Error.Code == "Request_BadRequest" || errorData.Error.Code == "InvalidRequest")
+                            {
+                                return BadRequest($"Cannot update user: {errorData.Error.Message}. " +
+                                    "This property may be read-only or require special permissions.");
+                            }
+                            else if (errorData.Error.Code == "ErrorInvalidProperty")
+                            {
+                                return BadRequest($"Invalid property: {errorData.Error.Message}. " +
+                                    "Please check the property name and try again.");
+                            }
+                            else if (errorData.Error.Code == "Authorization_RequestDenied")
+                            {
+                                return BadRequest($"Insufficient privileges: {errorData.Error.Message}. " +
+                                    "Your token has delegated permissions which only allow updating your own profile. " +
+                                    "For updating other users or restricted properties, application permissions (User.ReadWrite.All) with admin consent are required.");
+                            }
+                            else
+                            {
+                                return BadRequest($"{errorData.Error.Code}: {errorData.Error.Message}");
+                            }
+                        }
+                        return BadRequest("Unknown error updating user attributes. The property may not be writable.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to parse error response for user {UserId}", userId);
+                        return BadRequest($"Error updating user attributes: {errorContent}. This may indicate the property cannot be updated.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating user attributes with identifier: {Identifier}", identifier);
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Helper method to find user by Object ID, UPN, or email
         /// </summary>
-        /// <param name="identifier">User Object ID, UPN, or email address</param>
+        /// <param name="identifier">User Object ID, User Principal Name (UPN), or email address</param>
         /// <param name="accessToken">Access token for Microsoft Graph API</param>
         /// <returns>User object if found, null otherwise</returns>
         private async Task<User> FindUserByIdentifierAsync(string identifier, string accessToken)
@@ -369,45 +534,134 @@ namespace OIDC_ExternalID_API.Controllers
                 try
                 {
                     _logger.LogDebug("Attempting email search for identifier: {Identifier}", identifier);
-                    // Enhanced email search that checks multiple email fields
-                    var emailFilter = $"mail eq '{identifier}' or otherMails/any(x:x eq '{identifier}') or userPrincipalName eq '{identifier}' or signInNames/any(x:x/value eq '{identifier}') or proxyAddresses/any(x:contains(x,'{identifier}'))";
-                    _logger.LogDebug("Email search filter: {EmailFilter}", emailFilter);
-                    var response = await httpClient.GetAsync($"https://graph.microsoft.com/v1.0/users?$filter={emailFilter}&$top=1");
 
-                    _logger.LogDebug("Email search response status: {StatusCode}", response.StatusCode);
-
-                    if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    // First try simple UPN lookup (email might be the UPN)
+                    try
                     {
-                        _logger.LogWarning("403 Forbidden: Insufficient permissions for email-based user search. Check that User.Read.All permission has admin consent.");
-                        return null;
-                    }
-                    else if (response.IsSuccessStatusCode)
-                    {
-                        var jsonResponse = await response.Content.ReadAsStringAsync();
-                        _logger.LogDebug("Email search response: {JsonResponse}", jsonResponse);
-                        var usersResponse = JsonSerializer.Deserialize<JsonElement>(jsonResponse);
+                        _logger.LogDebug("Attempting UPN lookup for email identifier: {Identifier}", identifier);
+                        var upnResponse = await httpClient.GetAsync($"https://graph.microsoft.com/v1.0/users/{Uri.EscapeDataString(identifier)}");
 
-                        if (usersResponse.TryGetProperty("value", out var usersArray) && usersArray.GetArrayLength() > 0)
+                        if (upnResponse.IsSuccessStatusCode)
                         {
-                            var userJson = usersArray[0].GetRawText();
+                            var userJson = await upnResponse.Content.ReadAsStringAsync();
                             var user = JsonSerializer.Deserialize<User>(userJson);
-                            // Ensure user ID is set from the search result
-                            if (string.IsNullOrEmpty(user?.Id) && usersArray[0].TryGetProperty("id", out var idProperty))
+                            if (string.IsNullOrEmpty(user?.Id))
                             {
-                                user.Id = idProperty.GetString();
+                                user.Id = identifier;
                             }
-                            _logger.LogInformation("Found user via email search: {UserId}", user.Id);
+                            _logger.LogInformation("Found user via UPN lookup: {UserId}", user.Id);
                             return user;
+                        }
+                        else if (upnResponse.StatusCode != System.Net.HttpStatusCode.NotFound)
+                        {
+                            var errorContent = await upnResponse.Content.ReadAsStringAsync();
+                            _logger.LogWarning("UPN lookup failed: {StatusCode} - {ErrorContent}", upnResponse.StatusCode, errorContent);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "UPN lookup failed for identifier: {Identifier}", identifier);
+                    }
+
+                    // Try email search with simpler, more reliable approach
+                    try
+                    {
+                        _logger.LogDebug("Attempting email search with mail filter for identifier: {Identifier}", identifier);
+                        // Use URL-encoded email in filter
+                        var encodedEmail = Uri.EscapeDataString(identifier);
+                        var mailFilterResponse = await httpClient.GetAsync($"https://graph.microsoft.com/v1.0/users?$filter=mail eq '{encodedEmail}'&$top=1");
+
+                        if (mailFilterResponse.IsSuccessStatusCode)
+                        {
+                            var jsonResponse = await mailFilterResponse.Content.ReadAsStringAsync();
+                            var usersResponse = JsonSerializer.Deserialize<JsonElement>(jsonResponse);
+
+                            if (usersResponse.TryGetProperty("value", out var usersArray) && usersArray.GetArrayLength() > 0)
+                            {
+                                var userJson = usersArray[0].GetRawText();
+                                var user = JsonSerializer.Deserialize<User>(userJson);
+                                if (string.IsNullOrEmpty(user?.Id) && usersArray[0].TryGetProperty("id", out var idProperty))
+                                {
+                                    user.Id = idProperty.GetString();
+                                }
+                                _logger.LogInformation("Found user via mail filter: {UserId}", user.Id);
+                                return user;
+                            }
+                        }
+                        else if (mailFilterResponse.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                        {
+                            _logger.LogWarning("403 Forbidden: Insufficient permissions for mail filter search. Delegated permissions may not support this query.");
                         }
                         else
                         {
-                            _logger.LogDebug("No users found in email search result");
+                            var errorContent = await mailFilterResponse.Content.ReadAsStringAsync();
+                            _logger.LogDebug("Mail filter search failed: {StatusCode} - {ErrorContent}", mailFilterResponse.StatusCode, errorContent);
                         }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        var errorContent = await response.Content.ReadAsStringAsync();
-                        _logger.LogError("Email search failed: {StatusCode} - {ErrorContent}", response.StatusCode, errorContent);
+                        _logger.LogDebug(ex, "Mail filter search failed for identifier: {Identifier}", identifier);
+                    }
+
+                    // Try alternative approach: get all users and filter locally (for small directories)
+                    try
+                    {
+                        _logger.LogDebug("Attempting fallback: get all users and filter locally");
+                        var allUsersResponse = await httpClient.GetAsync("https://graph.microsoft.com/v1.0/users?$top=100");
+
+                        if (allUsersResponse.IsSuccessStatusCode)
+                        {
+                            var jsonResponse = await allUsersResponse.Content.ReadAsStringAsync();
+                            var usersResponse = JsonSerializer.Deserialize<JsonElement>(jsonResponse);
+
+                            if (usersResponse.TryGetProperty("value", out var usersArray))
+                            {
+                                foreach (var userElement in usersArray.EnumerateArray())
+                                {
+                                    // Check mail property
+                                    if (userElement.TryGetProperty("mail", out var mailProperty) &&
+                                        mailProperty.GetString()?.Equals(identifier, StringComparison.OrdinalIgnoreCase) == true)
+                                    {
+                                        var userJson = userElement.GetRawText();
+                                        var user = JsonSerializer.Deserialize<User>(userJson);
+                                        if (string.IsNullOrEmpty(user?.Id) && userElement.TryGetProperty("id", out var idProperty))
+                                        {
+                                            user.Id = idProperty.GetString();
+                                        }
+                                        _logger.LogInformation("Found user via local mail filter: {UserId}", user.Id);
+                                        return user;
+                                    }
+
+                                    // Check otherMails array
+                                    if (userElement.TryGetProperty("otherMails", out var otherMailsProperty))
+                                    {
+                                        foreach (var otherMail in otherMailsProperty.EnumerateArray())
+                                        {
+                                            if (otherMail.GetString()?.Equals(identifier, StringComparison.OrdinalIgnoreCase) == true)
+                                            {
+                                                var userJson = userElement.GetRawText();
+                                                var user = JsonSerializer.Deserialize<User>(userJson);
+                                                if (string.IsNullOrEmpty(user?.Id) && userElement.TryGetProperty("id", out var idProperty))
+                                                {
+                                                    user.Id = idProperty.GetString();
+                                                }
+                                                _logger.LogInformation("Found user via local otherMails filter: {UserId}", user.Id);
+                                                return user;
+                                            }
+                                        }
+                                    }
+                                }
+                                _logger.LogDebug("No users found with matching email in local search");
+                            }
+                        }
+                        else if (allUsersResponse.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                        {
+                            _logger.LogWarning("403 Forbidden: Insufficient permissions to list all users. Delegated permissions may not support this operation.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Fallback user search failed for identifier: {Identifier}", identifier);
                     }
                 }
                 catch (Exception ex)

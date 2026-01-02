@@ -257,6 +257,26 @@ namespace OIDC_ExternalID_API
                         Requires a valid Azure AD access token with delegated permissions (User.ReadWrite.All).";
                     break;
 
+                case "UpdateUserAttributesByIdentifier":
+                    operation.Summary = "Update Specific User Attributes by ID, UPN, or Email (Delegated Permissions)";
+                    operation.Description = @"
+                        Update specific user attributes using a structured model with delegated permissions.
+
+                        **Features:**
+                        - Uses the authenticated user's access token directly with Microsoft Graph API
+                        - Supports delegated permissions model
+                        - Type-safe updates with validation
+                        - Automatic user identification (ID, UPN, or email)
+
+                        **Supported Attributes:**
+                        - `firstName`: User's first name
+                        - `lastName`: User's last name
+                        - `DisplayName`: User's display name
+
+                        **Authentication:**
+                        Requires a valid Azure AD access token with delegated permissions (User.ReadWrite.All).";
+                    break;
+
                 case "DeleteUserByIdentifier":
                     operation.Summary = "Delete User by ID, UPN, or Email (Delegated Permissions)";
                     operation.Description = @"
@@ -339,6 +359,16 @@ namespace OIDC_ExternalID_API
                                         ["DisplayName"] = new OpenApiString("John Doe"),
                                         ["JobTitle"] = new OpenApiString("Software Engineer"),
                                         ["Department"] = new OpenApiString("Engineering")
+                                    };
+                                    break;
+
+                                case "DGraph.UpdateUserAttributesByIdentifier":
+
+                                    content.Value.Example = new OpenApiObject
+                                    {
+                                        ["firstName"] = new OpenApiString("John"),
+                                        ["lastName"] = new OpenApiString("Doe"),
+                                        ["DisplayName"] = new OpenApiString("John Doe")
                                     };
                                     break;
 

@@ -822,46 +822,6 @@ namespace OIDC_ExternalID_API.Controllers
             }
         }
 
-        [HttpGet("getWritableProperties/v1.0")]
-        [Authorize]
-        [ProducesResponseType(200)]
-        [ProducesResponseType(401)]
-        [ApiExplorerSettings(IgnoreApi = false)]
-        [SwaggerOperation(
-            Summary = "Get writable user properties",
-            Description = "Returns a list of user properties that can typically be updated.",
-            OperationId = "GetWritableProperties",
-            Tags = new[] { "CustomTest" }
-        )]
-        public IActionResult GetWritableProperties()
-        {
-            var writableProperties = new
-            {
-                BasicInfo = new[]
-                {
-                    "givenName", "surname", "displayName"
-                },
-                ContactInfo = new[]
-                {
-                    "mobilePhone", "businessPhones", "mail"
-                },
-                JobInfo = new[]
-                {
-                    "jobTitle", "department", "companyName", "officeLocation"
-                },
-                Location = new[]
-                {
-                    "streetAddress", "city", "state", "postalCode", "country"
-                },
-                Other = new[]
-                {
-                    "aboutMe", "birthday", "interests", "skills", "preferredLanguage"
-                }
-            };
-
-            return Ok(writableProperties);
-        }
-
         private string GetAccessTokenFromRequest()
         {
             try

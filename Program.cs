@@ -27,7 +27,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RequireExpirationTime = true, // Require expiration time in tokens
             ClockSkew = TimeSpan.Zero // No tolerance for clock differences
         };
-        
+
         // Handle authentication events for Azure AD tokens
         options.Events = new JwtBearerEvents
         {
@@ -46,7 +46,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                             var issuer = jwtToken.Claims.FirstOrDefault(c => c.Type == "iss")?.Value;
 
                             // Verify this is an Azure AD token
-                            if (!string.IsNullOrEmpty(issuer) && 
+                            if (!string.IsNullOrEmpty(issuer) &&
                                 (issuer.Contains("login.microsoftonline.com") || issuer.Contains("sts.windows.net")))
                             {
                                 // Validate token expiration
@@ -107,13 +107,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                         return Task.CompletedTask;
                     }
                 }
-                
+
                 return Task.CompletedTask;
             }
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("BlockAccess", policy =>
+    {
+        policy.RequireAssertion(context =>
+        {
+            // Always fail authorization for this policy
+            return false;
+        });
+    });
+});
 
 // Add the Graph API client
 var scopes = new[] { "https://graph.microsoft.com/.default" };
@@ -129,9 +139,9 @@ builder.Services.AddSingleton(new GraphServiceClient(clientSecretCredential, sco
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo 
-    { 
-        Title = "External ID Graph API", 
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "External ID Graph API",
         Version = "v1.0",
         Description = @"
         ## 🔐 Authentication & User Management API
@@ -144,7 +154,7 @@ builder.Services.AddSwaggerGen(c =>
         - **Token Format**: `Bearer <access_token>`
 
         ### Available Endpoints
-        
+
         **Token Management:**
         - Generate Azure AD access tokens for API authentication
 
@@ -206,10 +216,10 @@ builder.Services.AddSwaggerGen(c =>
 
     // Add operation filters for better documentation
     c.OperationFilter<SwaggerDefaultValues>();
-    
+
     // Add schema filters for better model documentation
     c.SchemaFilter<SwaggerSchemaFilter>();
-    
+
     // Include XML comments if available
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -245,7 +255,7 @@ builder.Services.AddCors(options =>
     {
         policy
             //https://localhost:7110
-            .WithOrigins("https://localhost:7110", 
+            .WithOrigins("https://localhost:7110",
             "https://externalid-restapi-hcbvbpeef6c8gbay.southeastasia-01.azurewebsites.net"
             ) // <-- Replace with your Swagger UI origin
             //.AllowAnyOrigin()
@@ -267,7 +277,7 @@ var app = builder.Build();
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "External ID Graph API v1");
         c.RoutePrefix = "swagger";
-        
+
         // Enhanced UI configuration
         c.DocumentTitle = "External ID Graph API Documentation";
         c.DefaultModelsExpandDepth(-1);
@@ -278,10 +288,10 @@ var app = builder.Build();
         c.EnableFilter();
         c.ShowExtensions();
         c.ShowCommonExtensions();
-        
+
         // Custom CSS for better styling
         c.InjectStylesheet("/swagger-ui/custom.css");
-        
+
         // Custom JavaScript for enhanced functionality
         c.InjectJavascript("/swagger-ui/custom.js");
     });

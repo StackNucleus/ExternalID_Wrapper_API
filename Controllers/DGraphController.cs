@@ -14,9 +14,12 @@ using System.Text.Json;
 
 namespace OIDC_ExternalID_API.Controllers
 {
+    [ApiExplorerSettings(IgnoreApi = true)]
     [ApiController]
-    [Route("[controller]")]
-    [Authorize]
+    //[Route("[controller]")]
+    //[Authorize]
+    //[NonAction]
+    [Authorize(Policy = "BlockAccess")]
     public class DGraphController : ControllerBase
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -847,11 +850,11 @@ namespace OIDC_ExternalID_API.Controllers
     /// </summary>
     public class UserInfo
     {
-        public string ObjectId { get; set; }
-        public string UserPrincipalName { get; set; }
-        public string Email { get; set; }
-        public string DisplayName { get; set; }
-        public string GivenName { get; set; }
-        public string Surname { get; set; }
+        public string? ObjectId { get; set; }
+        public string? UserPrincipalName { get; set; }
+        public string? Email { get; set; }
+        public string? DisplayName { get; set; }
+        public string? GivenName { get; set; }
+        public string? Surname { get; set; }
     }
 }

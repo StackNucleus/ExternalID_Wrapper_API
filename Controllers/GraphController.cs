@@ -61,6 +61,21 @@ namespace OIDC_ExternalID_API.Controllers
                     return BadRequest("Identifier parameter is required");
                 }
 
+                // Extract the delegated user from the token
+                var userFromToken = GetUserFromToken();
+                if (userFromToken == null)
+                {
+                    return Unauthorized("Invalid or missing delegated token");
+                }
+
+                // Ensure the identifier matches the delegated user
+                if (identifier != userFromToken.ObjectId &&
+                    identifier != userFromToken.UserPrincipalName &&
+                    identifier != userFromToken.Email)
+                {
+                    return Forbid("Access denied: Identifier does not match the delegated user");
+                }
+
                 User user = null;
 
                 if (identifier.Contains("@"))
@@ -136,6 +151,21 @@ namespace OIDC_ExternalID_API.Controllers
                 if (string.IsNullOrEmpty(identifier))
                 {
                     return BadRequest("Identifier parameter is required");
+                }
+
+                // Extract the delegated user from the token
+                var userFromToken = GetUserFromToken();
+                if (userFromToken == null)
+                {
+                    return Unauthorized("Invalid or missing delegated token");
+                }
+
+                // Ensure the identifier matches the delegated user
+                if (identifier != userFromToken.ObjectId &&
+                    identifier != userFromToken.UserPrincipalName &&
+                    identifier != userFromToken.Email)
+                {
+                    return Forbid("Access denied: Identifier does not match the delegated user");
                 }
 
                 if (updates == null || updates.Count == 0)
@@ -228,6 +258,21 @@ namespace OIDC_ExternalID_API.Controllers
                 if (string.IsNullOrEmpty(identifier))
                 {
                     return BadRequest("Identifier parameter is required");
+                }
+
+                // Extract the delegated user from the token
+                var userFromToken = GetUserFromToken();
+                if (userFromToken == null)
+                {
+                    return Unauthorized("Invalid or missing delegated token");
+                }
+
+                // Ensure the identifier matches the delegated user
+                if (identifier != userFromToken.ObjectId &&
+                    identifier != userFromToken.UserPrincipalName &&
+                    identifier != userFromToken.Email)
+                {
+                    return Forbid("Access denied: Identifier does not match the delegated user");
                 }
 
                 if (updates == null)
@@ -323,6 +368,21 @@ namespace OIDC_ExternalID_API.Controllers
                     return BadRequest("Identifier parameter is required");
                 }
 
+                // Extract the delegated user from the token
+                var userFromToken = GetUserFromToken();
+                if (userFromToken == null)
+                {
+                    return Unauthorized("Invalid or missing delegated token");
+                }
+
+                // Ensure the identifier matches the delegated user
+                if (identifier != userFromToken.ObjectId &&
+                    identifier != userFromToken.UserPrincipalName &&
+                    identifier != userFromToken.Email)
+                {
+                    return Forbid("Access denied: Identifier does not match the delegated user");
+                }
+
                 string userId = null;
 
                 if (identifier.Contains("@"))
@@ -407,7 +467,7 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 _logger.LogInformation("Using client credentials flow to get Microsoft Graph token for custom JWT");
-                
+
                 var tenantId = _config["AzureAd:TenantId"];
                 var clientId = _config["AzureAd:ClientId"];
                 var clientSecret = _config["AzureAd:ClientSecret"];
@@ -419,7 +479,7 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 using var client = _httpClientFactory.CreateClient();
-                
+
                 var tokenRequest = new FormUrlEncodedContent(new[]
                 {
                     new KeyValuePair<string, string>("grant_type", "client_credentials"),
@@ -429,7 +489,7 @@ namespace OIDC_ExternalID_API.Controllers
                 });
 
                 var tokenResponse = await client.PostAsync($"https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token", tokenRequest);
-                
+
                 if (tokenResponse.IsSuccessStatusCode)
                 {
                     var tokenContent = await tokenResponse.Content.ReadAsStringAsync();
@@ -450,6 +510,62 @@ namespace OIDC_ExternalID_API.Controllers
             }
         }
 
+        private string GetAccessTokenFromRequest()
+        {
+            try
+            {
+                var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+                if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+                {
+                    return null;
+                }
+
+                return authHeader.Substring("Bearer ".Length);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error extracting access token from request");
+                return null;
+            }
+        }
+
+        private UserInfo GetUserFromToken()
+        {
+            try
+            {
+                var accessToken = GetAccessTokenFromRequest();
+                if (string.IsNullOrEmpty(accessToken))
+                {
+                    return null;
+                }
+
+                var tokenHandler = new JwtSecurityTokenHandler();
+                if (!tokenHandler.CanReadToken(accessToken))
+                {
+                    _logger.LogWarning("Cannot read token");
+                    return null;
+                }
+
+                var jwtToken = tokenHandler.ReadJwtToken(accessToken);
+
+                return new UserInfo
+                {
+                    ObjectId = jwtToken.Claims.FirstOrDefault(c => c.Type == "oid")?.Value,
+                    UserPrincipalName = jwtToken.Claims.FirstOrDefault(c => c.Type == "upn")?.Value,
+                    Email = jwtToken.Claims.FirstOrDefault(c => c.Type == "unique_name")?.Value ??
+                           jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value,
+                    DisplayName = jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value,
+                    GivenName = jwtToken.Claims.FirstOrDefault(c => c.Type == "given_name")?.Value,
+                    Surname = jwtToken.Claims.FirstOrDefault(c => c.Type == "family_name")?.Value
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error extracting user info from token");
+                return null;
+            }
+        }
+
         private bool IsAzureAdToken(string token)
         {
             try
@@ -461,17 +577,17 @@ namespace OIDC_ExternalID_API.Controllers
                 if (tokenHandler.CanReadToken(token))
                 {
                     var jwtToken = tokenHandler.ReadJwtToken(token);
-                    
+
                     var issuer = jwtToken.Claims.FirstOrDefault(c => c.Type == "iss")?.Value;
                     var audience = jwtToken.Claims.FirstOrDefault(c => c.Type == "aud")?.Value;
-                    
-                    if (!string.IsNullOrEmpty(issuer) && 
+
+                    if (!string.IsNullOrEmpty(issuer) &&
                         (issuer.Contains("login.microsoftonline.com") || issuer.Contains("sts.windows.net")))
                     {
                         return true;
                     }
-                    
-                    if (!string.IsNullOrEmpty(audience) && 
+
+                    if (!string.IsNullOrEmpty(audience) &&
                         audience.Contains("graph.microsoft.com"))
                     {
                         return true;

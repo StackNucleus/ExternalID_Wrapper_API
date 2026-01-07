@@ -6,8 +6,12 @@ using System.Text.Json;
 
 namespace OIDC_ExternalID_API.Controllers
 {
+    [ApiExplorerSettings(IgnoreApi = true)]
     [ApiController]
-    [Route("[controller]")]
+    //[Route("[controller]")]
+    //[Authorize]
+    //[NonAction]
+    [Authorize(Policy = "BlockAccess")]
     public class TokenController : ControllerBase
     {
         private readonly IConfiguration _config;

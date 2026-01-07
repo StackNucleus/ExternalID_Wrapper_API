@@ -4,6 +4,7 @@ using Microsoft.Graph;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using OIDC_ExternalID_API;
+using OIDC_ExternalID_API.Middleware;
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 
@@ -304,6 +305,8 @@ app.UseCors("AllowSwaggerUI");
 app.UseStaticFiles();
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<ErrorHandlingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

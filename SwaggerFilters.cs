@@ -195,8 +195,8 @@ namespace OIDC_ExternalID_API
         {
             switch (actionName)
             {
-                case "GetUserByEmail":
-                    operation.Summary = "Get User by Email (GraphServiceClient)";
+                case "GetUserByIdentifier":
+                    operation.Summary = "Get User by ID, UPN, or Email (GraphServiceClient)";
                     operation.Description = @"
                         Retrieve user details using GraphServiceClient.
 
@@ -204,13 +204,24 @@ namespace OIDC_ExternalID_API
                         - Uses GraphServiceClient with Azure AD credentials
                         - Automatic token management
                         - Built-in error handling
+                        - Supports Object ID, UPN, or Email as identifier
 
                         **Authentication:**
-                        Uses configured Azure AD application credentials.";
+                        Uses configured Azure AD application credentials.
+
+                        **Example:**
+                        ```json
+                        {
+                          ""id"": ""123e4567-e89b-12d3-a456-426614174000"",
+                          ""displayName"": ""John Doe"",
+                          ""mail"": ""john.doe@example.com"",
+                          ""userPrincipalName"": ""john.doe@example.com""
+                        }
+                        ```";
                     break;
 
-                case "UpdateUserByEmail":
-                    operation.Summary = "Update User by Email (GraphServiceClient)";
+                case "UpdateUserByIdentifier":
+                    operation.Summary = "Update User by ID, UPN, or Email (GraphServiceClient)";
                     operation.Description = @"
                         Update user attributes using GraphServiceClient.
 
@@ -218,9 +229,61 @@ namespace OIDC_ExternalID_API
                         - Uses GraphServiceClient with Azure AD credentials
                         - Automatic token management
                         - Built-in error handling
+                        - Supports Object ID, UPN, or Email as identifier
 
                         **Authentication:**
-                        Uses configured Azure AD application credentials.";
+                        Uses configured Azure AD application credentials.
+
+                        **Example Request:**
+                        ```json
+                        {
+                          ""givenName"": ""John"",
+                          ""surname"": ""Doe"",
+                          ""displayName"": ""John Doe""
+                        }
+                        ```";
+                    break;
+
+                case "UpdateUserAttributesByIdentifier":
+                    operation.Summary = "Update Specific User Attributes by ID, UPN, or Email (GraphServiceClient)";
+                    operation.Description = @"
+                        Update specific user attributes using GraphServiceClient.
+
+                        **Features:**
+                        - Uses GraphServiceClient with Azure AD credentials
+                        - Automatic token management
+                        - Built-in error handling
+                        - Supports Object ID, UPN, or Email as identifier
+
+                        **Authentication:**
+                        Uses configured Azure AD application credentials.
+
+                        **Example Request:**
+                        ```json
+                        {
+                          ""firstName"": ""John"",
+                          ""lastName"": ""Doe"",
+                          ""DisplayName"": ""John Doe""
+                        }
+                        ```";
+                    break;
+
+                case "DeleteUserByIdentifier":
+                    operation.Summary = "Delete User by ID, UPN, or Email (GraphServiceClient)";
+                    operation.Description = @"
+                        Delete a user using GraphServiceClient.
+
+                        **Features:**
+                        - Uses GraphServiceClient with Azure AD credentials
+                        - Automatic token management
+                        - Built-in error handling
+                        - Supports Object ID, UPN, or Email as identifier
+
+                        **Authentication:**
+                        Uses configured Azure AD application credentials.
+
+                        **Note:**
+                        This operation is permanent and cannot be undone.";
                     break;
             }
         }

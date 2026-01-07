@@ -6,6 +6,7 @@ using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Graph.Models.ODataErrors;
 using OIDC_ExternalID_API.Models;
+using OIDC_ExternalID_API.Utilities;
 using Swashbuckle.AspNetCore.Annotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
@@ -62,7 +63,7 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 // Extract the delegated user from the token
-                var userFromToken = GetUserFromToken();
+                var userFromToken = TokenUtility.GetUserFromToken(TokenUtility.GetAccessTokenFromRequest(Request));
                 if (userFromToken == null)
                 {
                     return Unauthorized("Invalid or missing delegated token");
@@ -154,7 +155,7 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 // Extract the delegated user from the token
-                var userFromToken = GetUserFromToken();
+                var userFromToken = TokenUtility.GetUserFromToken(TokenUtility.GetAccessTokenFromRequest(Request));
                 if (userFromToken == null)
                 {
                     return Unauthorized("Invalid or missing delegated token");
@@ -214,7 +215,7 @@ namespace OIDC_ExternalID_API.Controllers
 
                 await _graphServiceClient.Users[userId].PatchAsync(userUpdate);
 
-                return Ok($"User updated successfully.");
+                return Ok("User updated successfully.");
             }
             catch (ODataError odataError)
             {
@@ -261,7 +262,7 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 // Extract the delegated user from the token
-                var userFromToken = GetUserFromToken();
+                var userFromToken = TokenUtility.GetUserFromToken(TokenUtility.GetAccessTokenFromRequest(Request));
                 if (userFromToken == null)
                 {
                     return Unauthorized("Invalid or missing delegated token");
@@ -323,7 +324,7 @@ namespace OIDC_ExternalID_API.Controllers
 
                 await _graphServiceClient.Users[userId].PatchAsync(userUpdate);
 
-                return Ok($"User updated successfully.");
+                return Ok("User updated successfully.");
             }
             catch (ODataError odataError)
             {
@@ -332,11 +333,11 @@ namespace OIDC_ExternalID_API.Controllers
                 {
                     return NotFound("User not found.");
                 }
-                return BadRequest(odataError.Error);
+                return BadRequest(new { Message = odataError.Error?.Message ?? "An error occurred while processing your request." });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                return StatusCode(500, new { Message = $"Internal server error: {ex.Message}" });
             }
         }
 
@@ -369,7 +370,7 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 // Extract the delegated user from the token
-                var userFromToken = GetUserFromToken();
+                var userFromToken = TokenUtility.GetUserFromToken(TokenUtility.GetAccessTokenFromRequest(Request));
                 if (userFromToken == null)
                 {
                     return Unauthorized("Invalid or missing delegated token");
@@ -418,7 +419,7 @@ namespace OIDC_ExternalID_API.Controllers
 
                 await _graphServiceClient.Users[userId].DeleteAsync();
 
-                return Ok($"User deleted successfully.");
+                return Ok("User deleted successfully.");
             }
             catch (ODataError odataError)
             {
@@ -427,11 +428,11 @@ namespace OIDC_ExternalID_API.Controllers
                 {
                     return NotFound("User not found.");
                 }
-                return BadRequest(odataError.Error);
+                return BadRequest(new { Message = odataError.Error?.Message ?? "An error occurred while processing your request." });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                return StatusCode(500, new { Message = $"Internal server error: {ex.Message}" });
             }
         }
 
@@ -510,61 +511,7 @@ namespace OIDC_ExternalID_API.Controllers
             }
         }
 
-        private string GetAccessTokenFromRequest()
-        {
-            try
-            {
-                var authHeader = Request.Headers["Authorization"].FirstOrDefault();
-                if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
-                {
-                    return null;
-                }
 
-                return authHeader.Substring("Bearer ".Length);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error extracting access token from request");
-                return null;
-            }
-        }
-
-        private UserInfo GetUserFromToken()
-        {
-            try
-            {
-                var accessToken = GetAccessTokenFromRequest();
-                if (string.IsNullOrEmpty(accessToken))
-                {
-                    return null;
-                }
-
-                var tokenHandler = new JwtSecurityTokenHandler();
-                if (!tokenHandler.CanReadToken(accessToken))
-                {
-                    _logger.LogWarning("Cannot read token");
-                    return null;
-                }
-
-                var jwtToken = tokenHandler.ReadJwtToken(accessToken);
-
-                return new UserInfo
-                {
-                    ObjectId = jwtToken.Claims.FirstOrDefault(c => c.Type == "oid")?.Value,
-                    UserPrincipalName = jwtToken.Claims.FirstOrDefault(c => c.Type == "upn")?.Value,
-                    Email = jwtToken.Claims.FirstOrDefault(c => c.Type == "unique_name")?.Value ??
-                           jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value,
-                    DisplayName = jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value,
-                    GivenName = jwtToken.Claims.FirstOrDefault(c => c.Type == "given_name")?.Value,
-                    Surname = jwtToken.Claims.FirstOrDefault(c => c.Type == "family_name")?.Value
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error extracting user info from token");
-                return null;
-            }
-        }
 
         private bool IsAzureAdToken(string token)
         {

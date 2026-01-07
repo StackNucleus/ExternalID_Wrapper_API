@@ -5,10 +5,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Graph.Models.ODataErrors;
-using Microsoft.IdentityModel.Tokens;
 using OIDC_ExternalID_API.Models;
+using OIDC_ExternalID_API.Utilities;
 using Swashbuckle.AspNetCore.Annotations;
-using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
@@ -64,14 +63,14 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 // Get the access token from the authenticated user
-                var accessToken = GetAccessTokenFromRequest();
+                var accessToken = TokenUtility.GetAccessTokenFromRequest(Request);
                 if (string.IsNullOrEmpty(accessToken))
                 {
                     return Unauthorized("Access token not found in Authorization header");
                 }
 
                 // First, try to get user info from the token itself
-                var userFromToken = GetUserFromToken(accessToken);
+                var userFromToken = TokenUtility.GetUserFromToken(accessToken);
                 User fullUser = null;
 
                 if (userFromToken != null)
@@ -178,14 +177,14 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 // Get the access token from the authenticated user
-                var accessToken = GetAccessTokenFromRequest();
+                var accessToken = TokenUtility.GetAccessTokenFromRequest(Request);
                 if (string.IsNullOrEmpty(accessToken))
                 {
                     return Unauthorized("Access token not found in Authorization header");
                 }
 
                 // First, try to get user info from the token itself (same logic as getUserByIdentifier)
-                var userFromToken = GetUserFromToken(accessToken);
+                var userFromToken = TokenUtility.GetUserFromToken(accessToken);
                 User user = null;
 
                 if (userFromToken != null)
@@ -263,7 +262,7 @@ namespace OIDC_ExternalID_API.Controllers
 
                 if (updateResponse.IsSuccessStatusCode)
                 {
-                    return Ok($"User updated successfully.");
+                    return Ok("User updated successfully.");
                 }
                 else
                 {
@@ -278,19 +277,15 @@ namespace OIDC_ExternalID_API.Controllers
                             // Provide specific guidance for common errors
                             if (errorData.Error.Code == "Request_BadRequest" || errorData.Error.Code == "InvalidRequest")
                             {
-                                return BadRequest($"Cannot update user: {errorData.Error.Message}. " +
-                                    "This property may be read-only or require special permissions.");
+                                return BadRequest($"Cannot update user: {errorData.Error.Message}. This property may be read-only or require special permissions.");
                             }
                             else if (errorData.Error.Code == "ErrorInvalidProperty")
                             {
-                                return BadRequest($"Invalid property: {errorData.Error.Message}. " +
-                                    "Please check the property name and try again.");
+                                return BadRequest($"Invalid property: {errorData.Error.Message}. Please check the property name and try again.");
                             }
                             else if (errorData.Error.Code == "Authorization_RequestDenied")
                             {
-                                return BadRequest($"Insufficient privileges: {errorData.Error.Message}. " +
-                                    "Your token has delegated permissions which only allow updating your own profile. " +
-                                    "For updating other users or restricted properties, application permissions (User.ReadWrite.All) with admin consent are required.");
+                                return BadRequest($"Insufficient privileges: {errorData.Error.Message}. Your token has delegated permissions which only allow updating your own profile. For updating other users or restricted properties, application permissions (User.ReadWrite.All) with admin consent are required.");
                             }
                             else
                             {
@@ -302,14 +297,14 @@ namespace OIDC_ExternalID_API.Controllers
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to parse error response for user {UserId}", userId);
-                        return BadRequest($"Error updating user: {errorContent}. This may indicate the property cannot be updated.");
+                        return BadRequest(new { Message = $"Error updating user: {errorContent}. This may indicate the property cannot be updated." });
                     }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating user with identifier: {Identifier}", identifier);
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                return StatusCode(500, ApiResponse<object>.CreateError($"Internal server error: {ex.Message}"));
             }
         }
 
@@ -348,14 +343,14 @@ namespace OIDC_ExternalID_API.Controllers
                 }
 
                 // Get the access token from the authenticated user
-                var accessToken = GetAccessTokenFromRequest();
+                var accessToken = TokenUtility.GetAccessTokenFromRequest(Request);
                 if (string.IsNullOrEmpty(accessToken))
                 {
                     return Unauthorized("Access token not found in Authorization header");
                 }
 
                 // First, try to get user info from the token itself (same logic as getUserByIdentifier)
-                var userFromToken = GetUserFromToken(accessToken);
+                var userFromToken = TokenUtility.GetUserFromToken(accessToken);
                 User user = null;
 
                 if (userFromToken != null)
@@ -428,7 +423,7 @@ namespace OIDC_ExternalID_API.Controllers
 
                 if (updateResponse.IsSuccessStatusCode)
                 {
-                    return Ok($"User attributes updated successfully.");
+                    return Ok("User attributes updated successfully.");
                 }
                 else
                 {
@@ -443,19 +438,15 @@ namespace OIDC_ExternalID_API.Controllers
                             // Provide specific guidance for common errors
                             if (errorData.Error.Code == "Request_BadRequest" || errorData.Error.Code == "InvalidRequest")
                             {
-                                return BadRequest($"Cannot update user: {errorData.Error.Message}. " +
-                                    "This property may be read-only or require special permissions.");
+                                return BadRequest($"Cannot update user: {errorData.Error.Message}. This property may be read-only or require special permissions.");
                             }
                             else if (errorData.Error.Code == "ErrorInvalidProperty")
                             {
-                                return BadRequest($"Invalid property: {errorData.Error.Message}. " +
-                                    "Please check the property name and try again.");
+                                return BadRequest($"Invalid property: {errorData.Error.Message}. Please check the property name and try again.");
                             }
                             else if (errorData.Error.Code == "Authorization_RequestDenied")
                             {
-                                return BadRequest($"Insufficient privileges: {errorData.Error.Message}. " +
-                                    "Your token has delegated permissions which only allow updating your own profile. " +
-                                    "For updating other users or restricted properties, application permissions (User.ReadWrite.All) with admin consent are required.");
+                                return BadRequest($"Insufficient privileges: {errorData.Error.Message}. Your token has delegated permissions which only allow updating your own profile. For updating other users or restricted properties, application permissions (User.ReadWrite.All) with admin consent are required.");
                             }
                             else
                             {
@@ -467,14 +458,14 @@ namespace OIDC_ExternalID_API.Controllers
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to parse error response for user {UserId}", userId);
-                        return BadRequest($"Error updating user attributes: {errorContent}. This may indicate the property cannot be updated.");
+                        return BadRequest(new { Message = $"Error updating user attributes: {errorContent}. This may indicate the property cannot be updated." });
                     }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating user attributes with identifier: {Identifier}", identifier);
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                return StatusCode(500, ApiResponse<object>.CreateError($"Internal server error: {ex.Message}"));
             }
         }
 
@@ -717,42 +708,6 @@ namespace OIDC_ExternalID_API.Controllers
         }
 
         /// <summary>
-        /// Extract user information from JWT token
-        /// </summary>
-        /// <param name="accessToken">JWT access token</param>
-        /// <returns>UserInfo object or null if token is invalid</returns>
-        private UserInfo GetUserFromToken(string accessToken)
-        {
-            try
-            {
-                var tokenHandler = new JwtSecurityTokenHandler();
-                if (!tokenHandler.CanReadToken(accessToken))
-                {
-                    _logger.LogWarning("Cannot read token");
-                    return null;
-                }
-
-                var jwtToken = tokenHandler.ReadJwtToken(accessToken);
-
-                return new UserInfo
-                {
-                    ObjectId = jwtToken.Claims.FirstOrDefault(c => c.Type == "oid")?.Value,
-                    UserPrincipalName = jwtToken.Claims.FirstOrDefault(c => c.Type == "upn")?.Value,
-                    Email = jwtToken.Claims.FirstOrDefault(c => c.Type == "unique_name")?.Value ??
-                           jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value,
-                    DisplayName = jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value,
-                    GivenName = jwtToken.Claims.FirstOrDefault(c => c.Type == "given_name")?.Value,
-                    Surname = jwtToken.Claims.FirstOrDefault(c => c.Type == "family_name")?.Value
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error extracting user info from token");
-                return null;
-            }
-        }
-
-        /// <summary>
         /// Get full user details from Azure AD using object ID
         /// </summary>
         /// <param name="objectId">User's object ID</param>
@@ -824,37 +779,5 @@ namespace OIDC_ExternalID_API.Controllers
                 return null;
             }
         }
-
-        private string GetAccessTokenFromRequest()
-        {
-            try
-            {
-                var authHeader = Request.Headers["Authorization"].FirstOrDefault();
-                if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
-                {
-                    return null;
-                }
-
-                return authHeader.Substring("Bearer ".Length);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error extracting access token from request");
-                return null;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Simple user info class to hold data extracted from token
-    /// </summary>
-    public class UserInfo
-    {
-        public string? ObjectId { get; set; }
-        public string? UserPrincipalName { get; set; }
-        public string? Email { get; set; }
-        public string? DisplayName { get; set; }
-        public string? GivenName { get; set; }
-        public string? Surname { get; set; }
     }
 }

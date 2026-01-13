@@ -31,6 +31,9 @@ namespace OIDC_ExternalID_API
                 case "Graph":
                     AddGraphControllerDocs(operation, actionName);
                     break;
+                case "GraphPhoneAuthentication":
+                    AddGraphPhoneAuthenticationControllerDocs(operation, actionName);
+                    break;
             }
 
             // Add common examples for all operations
@@ -357,6 +360,87 @@ namespace OIDC_ExternalID_API
             }
         }
 
+        private void AddGraphPhoneAuthenticationControllerDocs(OpenApiOperation operation, string actionName)
+        {
+            switch (actionName)
+            {
+                case "GetPhoneAuthenticationMethod":
+                    operation.Summary = "Get Phone Authentication Methods (GraphServiceClient)";
+                    operation.Description = @"
+                        Retrieve phone authentication methods for a user using GraphServiceClient.
+
+                        **Features:**
+                        - Uses GraphServiceClient with Azure AD credentials
+                        - Automatic token management
+                        - Built-in error handling
+                        - Supports Object ID, UPN, or Email as identifier
+
+                        **Authentication:**
+                        Uses configured Azure AD application credentials.
+
+                        **Returns:**
+                        - List of phone authentication methods for the user
+                        - Each method contains phone number, type, ID, and sign-in state";
+                    break;
+
+                case "AddPhoneAuthenticationMethod":
+                    operation.Summary = "Add Phone Authentication Method (GraphServiceClient)";
+                    operation.Description = @"
+                        Add a new phone authentication method for a user using GraphServiceClient.
+
+                        **Features:**
+                        - Uses GraphServiceClient with Azure AD credentials
+                        - Automatic token management
+                        - Built-in error handling
+                        - Supports Object ID, UPN, or Email as identifier
+
+                        **Authentication:**
+                        Uses configured Azure AD application credentials.
+
+                        **Request Body:**
+                        - phoneNumber: The phone number to add
+                        - phoneType: The type of phone (mobile, alternateMobile, office)";
+                    break;
+
+                case "UpdatePhoneAuthenticationMethod":
+                    operation.Summary = "Update Phone Authentication Method (GraphServiceClient)";
+                    operation.Description = @"
+                        Update an existing phone authentication method for a user using GraphServiceClient.
+
+                        **Features:**
+                        - Uses GraphServiceClient with Azure AD credentials
+                        - Automatic token management
+                        - Built-in error handling
+                        - Supports Object ID, UPN, or Email as identifier
+
+                        **Authentication:**
+                        Uses configured Azure AD application credentials.
+
+                        **Request Body:**
+                        - phoneNumber: The updated phone number
+                        - phoneType: The updated phone type (mobile, alternateMobile, office)";
+                    break;
+
+                case "DeletePhoneAuthenticationMethod":
+                    operation.Summary = "Delete Phone Authentication Method (GraphServiceClient)";
+                    operation.Description = @"
+                        Delete an existing phone authentication method for a user using GraphServiceClient.
+
+                        **Features:**
+                        - Uses GraphServiceClient with Azure AD credentials
+                        - Automatic token management
+                        - Built-in error handling
+                        - Supports Object ID, UPN, or Email as identifier
+
+                        **Authentication:**
+                        Uses configured Azure AD application credentials.
+
+                        **Note:**
+                        This operation is permanent and cannot be undone.";
+                    break;
+            }
+        }
+
         private void AddCommonExamples(OpenApiOperation operation, OperationFilterContext context)
         {
             // Add examples for common parameters
@@ -445,6 +529,24 @@ namespace OIDC_ExternalID_API
                                             ["password"] = new OpenApiString("TempPassword123!"),
                                             ["forceChangePasswordNextSignIn"] = new OpenApiBoolean(true)
                                         }
+                                    };
+                                    break;
+
+                                case "GraphPhoneAuthentication.AddPhoneAuthenticationMethod":
+
+                                    content.Value.Example = new OpenApiObject
+                                    {
+                                        ["phoneNumber"] = new OpenApiString("+1 2065555555"),
+                                        ["phoneType"] = new OpenApiString("mobile")
+                                    };
+                                    break;
+
+                                case "GraphPhoneAuthentication.UpdatePhoneAuthenticationMethod":
+
+                                    content.Value.Example = new OpenApiObject
+                                    {
+                                        ["phoneNumber"] = new OpenApiString("+1 2065555554"),
+                                        ["phoneType"] = new OpenApiString("mobile")
                                     };
                                     break;
                             }

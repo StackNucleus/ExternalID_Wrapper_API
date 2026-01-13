@@ -28,6 +28,7 @@ A streamlined ASP.NET Core Web API for managing Azure AD users through Microsoft
 
 ### Available Endpoints
 - **GraphController**: Uses application permissions to interact with Microsoft Graph
+- **GraphPhoneAuthenticationController**: Uses application permissions to manage phone authentication methods
 - **DGraphController**: Uses delegated permissions to interact with Microsoft Graph (hidden from Swagger)
 - **TokenController**: Generates Azure AD tokens for authentication (hidden from Swagger)
 
@@ -235,6 +236,81 @@ Delete a user by their identifier (Object ID, UPN, or Email).
 }
 ```
 
+### 6. Get Phone Authentication Methods
+Retrieve phone authentication methods for a user by their identifier (Object ID, UPN, or Email).
+
+**Endpoint**: `GET /GraphPhoneAuthentication/v1.0/getPhoneAuthenticationMethod?identifier={identifier}`
+
+**Response**:
+```json
+[
+  {
+    "phoneNumber": "+1 2065555555",
+    "phoneType": "mobile",
+    "id": "3179e48a-750b-4051-897c-87b9720928f7",
+    "smsSignInState": "ready"
+  }
+]
+```
+
+### 7. Add Phone Authentication Method
+Add a new phone authentication method for a user by their identifier (Object ID, UPN, or Email).
+
+**Endpoint**: `POST /GraphPhoneAuthentication/v1.0/addPhoneAuthenticationMethod?identifier={identifier}`
+
+**Request**:
+```json
+{
+  "phoneNumber": "+1 2065555555",
+  "phoneType": "mobile"
+}
+```
+
+**Response**:
+```json
+{
+  "phoneNumber": "+1 2065555555",
+  "phoneType": "mobile",
+  "id": "3179e48a-750b-4051-897c-87b9720928f7",
+  "smsSignInState": "ready"
+}
+```
+
+### 8. Update Phone Authentication Method
+Update an existing phone authentication method for a user by their identifier (Object ID, UPN, or Email) and phone method ID.
+
+**Endpoint**: `PATCH /GraphPhoneAuthentication/v1.0/updatePhoneAuthenticationMethod?identifier={identifier}&phoneMethodId={phoneMethodId}`
+
+**Request**:
+```json
+{
+  "phoneNumber": "+1 2065555554",
+  "phoneType": "mobile"
+}
+```
+
+**Response**:
+```json
+{
+  "phoneNumber": "+1 2065555554",
+  "phoneType": "mobile",
+  "id": "3179e48a-750b-4051-897c-87b9720928f7",
+  "smsSignInState": "ready"
+}
+```
+
+### 9. Delete Phone Authentication Method
+Delete an existing phone authentication method for a user by their identifier (Object ID, UPN, or Email) and phone method ID.
+
+**Endpoint**: `DELETE /GraphPhoneAuthentication/v1.0/deletePhoneAuthenticationMethod?identifier={identifier}&phoneMethodId={phoneMethodId}`
+
+**Response**:
+```json
+{
+  "message": "Phone authentication method deleted successfully."
+}
+```
+
 ## ⚙️ Configuration
 
 ### Required Configuration
@@ -401,6 +477,40 @@ curl -X PATCH "https://localhost:7110/Graph/updateUserByIdentifier/v1.0?identifi
 #### Delete User
 ```bash
 curl -X DELETE "https://localhost:7110/Graph/deleteUserByIdentifier/v1.0?identifier=user@example.com" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+#### Get Phone Authentication Methods
+```bash
+curl -X GET "https://localhost:7110/GraphPhoneAuthentication/v1.0/getPhoneAuthenticationMethod?identifier=user@example.com" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+#### Add Phone Authentication Method
+```bash
+curl -X POST "https://localhost:7110/GraphPhoneAuthentication/v1.0/addPhoneAuthenticationMethod?identifier=user@example.com" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phoneNumber": "+1 2065555555",
+    "phoneType": "mobile"
+  }'
+```
+
+#### Update Phone Authentication Method
+```bash
+curl -X PATCH "https://localhost:7110/GraphPhoneAuthentication/v1.0/updatePhoneAuthenticationMethod?identifier=user@example.com&phoneMethodId=3179e48a-750b-4051-897c-87b9720928f7" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phoneNumber": "+1 2065555554",
+    "phoneType": "mobile"
+  }'
+```
+
+#### Delete Phone Authentication Method
+```bash
+curl -X DELETE "https://localhost:7110/GraphPhoneAuthentication/v1.0/deletePhoneAuthenticationMethod?identifier=user@example.com&phoneMethodId=3179e48a-750b-4051-897c-87b9720928f7" \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
